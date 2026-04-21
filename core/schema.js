@@ -1,73 +1,89 @@
-// Unified fit.mi v2 database. One IndexedDB named 'fitmi' holds every
-// object store from the three legacy apps, plus the new ones.
+// Unified fit.mi v2 database.
 //
-// Bumping FITMI_DB_VERSION requires extending the upgrade() callback to
-// handle every prior version (oldVersion < N branches). For now we only
-// ship version 1; phase 2 intentionally freezes the shape so legacy data
-// can migrate in cleanly.
+// Every user store uses string UUIDs as primary keys so records can be
+// created on any device without auto-increment collisions. Sync metadata
+// (updatedAt, deletedAt) lives as plain fields on each record — handled
+// by the DB wrapper, not by extra columns — so we don't have to declare
+// indexes for them in every store.
+//
+// Two internal stores drive the sync engine:
+//   _outbox  pending changes waiting to be pushed to Supabase
+//   _sync    per-user sync cursors (lastPullAt, signedInAs, etc.)
 
 import { DB } from './db.js';
 
 export const FITMI_DB_NAME = 'fitmi';
 export const FITMI_DB_VERSION = 1;
 
+// Stores that should participate in cloud sync. Settings is included so
+// preferences (monthly budget, TDEE profile) propagate across devices.
+export const SYNCED_STORES = [
+  'food_log', 'custom_foods', 'water_log',
+  'meals', 'recipes', 'shopping_extra', 'favorites',
+  'exercises', 'workouts', 'sets', 'templates',
+  'weight_log',
+  'habits', 'completions',
+  'expenses', 'subscriptions', 'savings',
+  'settings',
+];
+
 export function upgrade(db) {
   // ----- Nutrition -----
   if (!db.objectStoreNames.contains('food_log')) {
-    const s = db.createObjectStore('food_log', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('food_log', { keyPath: 'id' });
     s.createIndex('date', 'date', { unique: false });
   }
   if (!db.objectStoreNames.contains('custom_foods')) {
-    const s = db.createObjectStore('custom_foods', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('custom_foods', { keyPath: 'id' });
     s.createIndex('name', 'name', { unique: false });
     s.createIndex('category', 'category', { unique: false });
   }
   if (!db.objectStoreNames.contains('water_log')) {
-    const s = db.createObjectStore('water_log', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('water_log', { keyPath: 'id' });
     s.createIndex('date', 'date', { unique: false });
   }
 
   // ----- Meals -----
   if (!db.objectStoreNames.contains('meals')) {
-    const s = db.createObjectStore('meals', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('meals', { keyPath: 'id' });
     s.createIndex('weekKey', 'weekKey', { unique: false });
   }
   if (!db.objectStoreNames.contains('recipes')) {
-    db.createObjectStore('recipes', { keyPath: 'id', autoIncrement: true });
+    db.createObjectStore('recipes', { keyPath: 'id' });
   }
   if (!db.objectStoreNames.contains('shopping_extra')) {
-    const s = db.createObjectStore('shopping_extra', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('shopping_extra', { keyPath: 'id' });
     s.createIndex('weekKey', 'weekKey', { unique: false });
   }
   if (!db.objectStoreNames.contains('favorites')) {
-    db.createObjectStore('favorites', { keyPath: 'id', autoIncrement: true });
+    db.createObjectStore('favorites', { keyPath: 'id' });
   }
 
   // ----- Training -----
   if (!db.objectStoreNames.contains('exercises')) {
-    const s = db.createObjectStore('exercises', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('exercises', { keyPath: 'id' });
     s.createIndex('muscleGroup', 'muscleGroup', { unique: false });
   }
   if (!db.objectStoreNames.contains('workouts')) {
-    const s = db.createObjectStore('workouts', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('workouts', { keyPath: 'id' });
     s.createIndex('startedAt', 'startedAt', { unique: false });
   }
   if (!db.objectStoreNames.contains('sets')) {
-    const s = db.createObjectStore('sets', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('sets', { keyPath: 'id' });
     s.createIndex('workoutId', 'workoutId', { unique: false });
     s.createIndex('exerciseId', 'exerciseId', { unique: false });
   }
   if (!db.objectStoreNames.contains('templates')) {
-    db.createObjectStore('templates', { keyPath: 'id', autoIncrement: true });
+    db.createObjectStore('templates', { keyPath: 'id' });
   }
 
   // ----- Tracking -----
   if (!db.objectStoreNames.contains('weight_log')) {
-    const s = db.createObjectStore('weight_log', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('weight_log', { keyPath: 'id' });
     s.createIndex('date', 'date', { unique: false });
   }
 
-  // ----- Habits (new in v2) -----
+  // ----- Habits -----
   if (!db.objectStoreNames.contains('habits')) {
     const s = db.createObjectStore('habits', { keyPath: 'id' });
     s.createIndex('order', 'order', { unique: false });
@@ -79,22 +95,36 @@ export function upgrade(db) {
     s.createIndex('habitDate', ['habitId', 'date'], { unique: false });
   }
 
-  // ----- Budget (new in v2) -----
+  // ----- Budget -----
   if (!db.objectStoreNames.contains('expenses')) {
-    const s = db.createObjectStore('expenses', { keyPath: 'id', autoIncrement: true });
+    const s = db.createObjectStore('expenses', { keyPath: 'id' });
     s.createIndex('date', 'date', { unique: false });
     s.createIndex('category', 'category', { unique: false });
   }
   if (!db.objectStoreNames.contains('subscriptions')) {
-    db.createObjectStore('subscriptions', { keyPath: 'id', autoIncrement: true });
+    db.createObjectStore('subscriptions', { keyPath: 'id' });
   }
   if (!db.objectStoreNames.contains('savings')) {
-    db.createObjectStore('savings', { keyPath: 'id', autoIncrement: true });
+    db.createObjectStore('savings', { keyPath: 'id' });
   }
 
   // ----- Common -----
+  // settings uses the namespaced key (e.g. 'budget.monthly') as its id.
   if (!db.objectStoreNames.contains('settings')) {
     db.createObjectStore('settings', { keyPath: 'key' });
+  }
+
+  // ----- Sync internals -----
+  // _outbox tracks records that were modified locally and still need to
+  // be pushed to Supabase. Keyed by composite "store:id" so a record that
+  // is edited multiple times before the next push collapses into a single
+  // outbox entry.
+  if (!db.objectStoreNames.contains('_outbox')) {
+    db.createObjectStore('_outbox', { keyPath: 'key' });
+  }
+  // _sync holds per-user cursors: lastPullAt (global), signedInAs, etc.
+  if (!db.objectStoreNames.contains('_sync')) {
+    db.createObjectStore('_sync', { keyPath: 'key' });
   }
 }
 
@@ -102,7 +132,7 @@ export function initFitmiDB() {
   DB.init({ name: FITMI_DB_NAME, version: FITMI_DB_VERSION, upgrade });
 }
 
-// Settings key namespaces used by the rest of the app.
+// Namespaced keys for the settings store.
 export const SETTINGS_KEYS = {
   // Nutrition
   NUTRITION_TDEE: 'nutrition.tdee',

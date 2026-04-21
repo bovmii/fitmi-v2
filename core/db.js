@@ -1,7 +1,31 @@
-// Generic IndexedDB wrapper. The schema is declared by the caller via
-// DB.init({ name, version, upgrade }). The upgrade callback receives the
-// raw IDBDatabase instance and is responsible for createObjectStore /
-// createIndex calls. Phase 2 wires the fit.mi v2 schema on top of this.
+// IndexedDB wrapper. Every mutation (`put`, `delete`) is implicitly
+// instrumented for sync:
+//   - `put` stamps `updatedAt` (server-ish timestamp, client clock) and
+//     enqueues the record into the `_outbox` store.
+//   - `delete` performs a soft-delete: it sets `deletedAt` on the record
+//     and leaves the row in place so the sync engine can propagate the
+//     tombstone to Supabase, which in turn lets other devices remove the
+//     row locally. Hard removal happens via `purge` after confirmation
+//     from the server.
+//
+// Call `DB.init({ name, version, upgrade })` before any other method.
+// `DB.setSyncEnabled(false)` temporarily suppresses outbox writes — used
+// by the legacy importer so the upfront bulk load doesn't generate 500
+// outbox rows before we know the user has a Supabase session.
+
+import { uuid } from './ids.js';
+import { Bus } from './bus.js';
+
+let syncEnabled = true;
+const INTERNAL_STORES = new Set(['_outbox', '_sync']);
+
+function isoNow() {
+  return new Date().toISOString();
+}
+
+function keyOf(store, id) {
+  return `${store}:${id}`;
+}
 
 export const DB = {
   _db: null,
@@ -10,6 +34,14 @@ export const DB = {
   init({ name, version, upgrade }) {
     this._config = { name, version, upgrade };
     this._db = null;
+  },
+
+  setSyncEnabled(value) {
+    syncEnabled = Boolean(value);
+  },
+
+  isSyncEnabled() {
+    return syncEnabled;
   },
 
   open() {
@@ -35,6 +67,11 @@ export const DB = {
     });
   },
 
+  async getAllActive(store) {
+    const rows = await this.getAll(store);
+    return rows.filter((r) => !r.deletedAt);
+  },
+
   async get(store, key) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
@@ -56,27 +93,75 @@ export const DB = {
     });
   },
 
-  async put(store, data) {
+  // Main mutation. Assigns an id if missing, stamps `updatedAt`, and
+  // enqueues the record for sync unless the store is internal.
+  async put(store, record) {
     const db = await this.open();
+    const keyPath = store === 'settings' ? 'key' : 'id';
+    const toStore = { ...record };
+    if (!toStore[keyPath]) {
+      if (keyPath === 'id') toStore.id = uuid();
+      else throw new Error(`put('${store}') requires a ${keyPath}`);
+    }
+    toStore.updatedAt = isoNow();
+    if (!('deletedAt' in toStore)) toStore.deletedAt = null;
+
+    const isInternal = INTERNAL_STORES.has(store);
+    const stores = isInternal || !syncEnabled ? [store] : [store, '_outbox'];
+
     return new Promise((resolve, reject) => {
-      const tx = db.transaction(store, 'readwrite');
-      const req = tx.objectStore(store).put(data);
-      req.onsuccess = () => resolve(req.result);
+      const tx = db.transaction(stores, 'readwrite');
+      tx.objectStore(store).put(toStore);
+      if (stores.includes('_outbox')) {
+        const id = toStore[keyPath];
+        tx.objectStore('_outbox').put({
+          key: keyOf(store, id),
+          store,
+          id,
+          updatedAt: toStore.updatedAt,
+        });
+      }
+      tx.oncomplete = () => {
+        if (!isInternal) Bus.emit('db.put', { store, id: toStore[keyPath] });
+        resolve(toStore);
+      };
       tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
   },
 
-  async add(store, data) {
-    const db = await this.open();
-    return new Promise((resolve, reject) => {
-      const tx = db.transaction(store, 'readwrite');
-      const req = tx.objectStore(store).add(data);
-      req.onsuccess = () => resolve(req.result);
-      tx.onerror = () => reject(tx.error);
-    });
-  },
-
+  // Soft delete: marks deletedAt and keeps the row so sync can propagate
+  // the tombstone. `purge` deletes the row outright.
   async delete(store, key) {
+    const db = await this.open();
+    const existing = await this.get(store, key);
+    if (!existing) return;
+    const keyPath = store === 'settings' ? 'key' : 'id';
+    const tombstone = { ...existing, deletedAt: isoNow(), updatedAt: isoNow() };
+
+    const isInternal = INTERNAL_STORES.has(store);
+    const stores = isInternal || !syncEnabled ? [store] : [store, '_outbox'];
+
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(stores, 'readwrite');
+      tx.objectStore(store).put(tombstone);
+      if (stores.includes('_outbox')) {
+        tx.objectStore('_outbox').put({
+          key: keyOf(store, tombstone[keyPath]),
+          store,
+          id: tombstone[keyPath],
+          updatedAt: tombstone.updatedAt,
+        });
+      }
+      tx.oncomplete = () => {
+        if (!isInternal) Bus.emit('db.delete', { store, id: tombstone[keyPath] });
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+
+  async purge(store, key) {
     const db = await this.open();
     return new Promise((resolve, reject) => {
       const tx = db.transaction(store, 'readwrite');
@@ -96,19 +181,28 @@ export const DB = {
     });
   },
 
-  // Read-through settings helper. `settings` store must have keyPath 'key'.
+  // Settings helpers. Reads and writes through the normal put/get, so
+  // preferences are synced like any other row.
   async getSetting(key, fallback = null) {
     const row = await this.get('settings', key);
-    return row ? row.value : fallback;
+    if (!row || row.deletedAt) return fallback;
+    return row.value;
   },
 
   async setSetting(key, value) {
     return this.put('settings', { key, value });
   },
-};
 
-// Stable id generator for stores that don't use autoIncrement (habits,
-// completions). Same algorithm as habitstack: base-36 timestamp + random.
-export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
+  // Raw write bypassing sync stamping. Used by the sync pull path when it
+  // receives authoritative rows from Supabase — we don't want to re-stamp
+  // updatedAt with the local clock.
+  async putRaw(store, record) {
+    const db = await this.open();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(store, 'readwrite');
+      tx.objectStore(store).put(record);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  },
+};

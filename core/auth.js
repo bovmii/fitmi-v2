@@ -1,63 +1,133 @@
-// GitHub OAuth via a Cloudflare Worker proxy.
-// Config reused from the original fit.mi app — same GitHub OAuth App, same
-// worker, same allowlist. The callback URL for GitHub Pages
-// (https://bovmii.github.io/fitmi-v2/) must be registered in the OAuth app.
+// Authentication: Supabase Auth with GitHub OAuth.
+//
+// When Supabase is unconfigured the module runs in "local-only" mode:
+// isAuthenticated() returns true, getUser() returns a synthetic local
+// user and the rest of the app behaves as if logged in. This lets the
+// user keep working on their Mac / phone before the cloud sync is
+// wired.
+//
+// When Supabase is configured the flow is:
+//   1. User clicks "Se connecter avec GitHub"
+//   2. signInWithOAuth() redirects to GitHub → back to the app
+//   3. detectSessionInUrl picks the access_token out of the URL hash
+//   4. onAuthStateChange fires with the session
+//   5. We check the GitHub login against ALLOWED_GITHUB_LOGINS; if not in
+//      the list, we sign them out immediately.
 
-const AUTH_CONFIG = {
-  clientId: 'Ov23lilWpiYpbnJaIm1w',
-  workerUrl: 'https://github-auth-proxy.boumi311.workers.dev',
-  redirectUri: window.location.origin + window.location.pathname,
-  allowedUsers: ['bovmii'],
+import { client, isConfigured } from './supabase.js';
+import { ALLOWED_GITHUB_LOGINS } from '../config.js';
+
+const LOCAL_USER = {
+  id: 'local',
+  login: 'local',
+  name: 'Toi (hors-ligne)',
+  avatar_url: '',
+  local: true,
 };
 
+let _session = null;
+let _listeners = new Set();
+
+function notify() {
+  for (const l of _listeners) {
+    try { l(_session); } catch (err) { console.error('[auth] listener', err); }
+  }
+}
+
+function sessionToUser(session) {
+  if (!session?.user) return null;
+  const meta = session.user.user_metadata || {};
+  return {
+    id: session.user.id,
+    login: meta.user_name || meta.preferred_username || meta.user_name || 'unknown',
+    name: meta.full_name || meta.name || meta.user_name || 'Toi',
+    avatar_url: meta.avatar_url || '',
+    local: false,
+  };
+}
+
 export const Auth = {
+  isConfigured,
+
+  async init() {
+    if (!isConfigured()) {
+      _session = { user: LOCAL_USER, localOnly: true };
+      notify();
+      return;
+    }
+    const sb = await client();
+    const { data: { session } } = await sb.auth.getSession();
+    await this._applySession(session);
+    sb.auth.onAuthStateChange((_event, next) => {
+      this._applySession(next);
+    });
+  },
+
+  async _applySession(session) {
+    if (!session) {
+      _session = null;
+      notify();
+      return;
+    }
+    const login = sessionToUser(session)?.login;
+    if (!ALLOWED_GITHUB_LOGINS.includes(login)) {
+      const sb = await client();
+      await sb.auth.signOut();
+      _session = null;
+      notify();
+      return;
+    }
+    _session = session;
+    notify();
+  },
+
   isAuthenticated() {
-    const session = JSON.parse(localStorage.getItem('auth_session') || 'null');
-    return session && AUTH_CONFIG.allowedUsers.includes(session.login);
+    return Boolean(_session?.user);
+  },
+
+  isLocalOnly() {
+    return Boolean(_session?.localOnly);
   },
 
   getUser() {
-    return JSON.parse(localStorage.getItem('auth_session') || 'null');
+    if (!_session) return null;
+    if (_session.localOnly) return LOCAL_USER;
+    return sessionToUser(_session);
   },
 
-  login() {
-    const params = new URLSearchParams({
-      client_id: AUTH_CONFIG.clientId,
-      redirect_uri: AUTH_CONFIG.redirectUri,
-      scope: 'read:user',
-    });
-    window.location.href = `https://github.com/login/oauth/authorize?${params}`;
+  getUserId() {
+    if (!_session) return null;
+    return _session.localOnly ? 'local' : _session.user.id;
   },
 
-  async handleCallback() {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (!code) return false;
-    try {
-      const res = await fetch(AUTH_CONFIG.workerUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code }),
-      });
-      const data = await res.json();
-      if (data.error || !AUTH_CONFIG.allowedUsers.includes(data.login)) return false;
-      // Only persist what the UI actually needs — dropped access_token
-      // compared to the legacy apps since no authenticated GitHub API call
-      // is made from the client.
-      localStorage.setItem('auth_session', JSON.stringify({
-        login: data.login,
-        avatar_url: data.avatar_url,
-        name: data.name,
-      }));
-      window.history.replaceState({}, '', window.location.pathname);
-      return true;
-    } catch {
-      return false;
+  onChange(listener) {
+    _listeners.add(listener);
+    listener(_session);
+    return () => _listeners.delete(listener);
+  },
+
+  async login() {
+    if (!isConfigured()) {
+      console.warn('[auth] Supabase not configured — login is a no-op');
+      return;
     }
+    const sb = await client();
+    await sb.auth.signInWithOAuth({
+      provider: 'github',
+      options: {
+        redirectTo: window.location.origin + window.location.pathname,
+        scopes: 'read:user',
+      },
+    });
   },
 
-  logout() {
-    localStorage.removeItem('auth_session');
+  async logout() {
+    if (isConfigured()) {
+      const sb = await client();
+      await sb.auth.signOut();
+    }
+    _session = null;
+    notify();
     window.location.reload();
   },
 };
