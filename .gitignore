@@ -1,0 +1,6 @@
+_sources/
+node_modules/
+.DS_Store
+ios/
+.env
+*.log
