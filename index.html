@@ -9,62 +9,12 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@700;800&family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg: #0a0a0a;
-      --text: #f5f2ec;
-      --accent: #c4a87a;
-      --border: #1e1e1e;
-    }
-    @media (prefers-color-scheme: light) {
-      :root {
-        --bg: #f5f2ec;
-        --text: #1a1814;
-        --accent: #8b7355;
-        --border: #e0dbd0;
-      }
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body {
-      height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'DM Sans', -apple-system, system-ui, sans-serif;
-    }
-    body {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-      text-align: center;
-    }
-    .logo {
-      font-family: 'Outfit', sans-serif;
-      font-weight: 800;
-      font-size: 48px;
-      letter-spacing: -0.02em;
-    }
-    .logo .accent { color: var(--accent); }
-    .tagline {
-      margin-top: 12px;
-      font-size: 15px;
-      opacity: 0.7;
-      font-weight: 500;
-    }
-    .status {
-      margin-top: 48px;
-      padding: 16px 24px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      font-size: 14px;
-      opacity: 0.6;
-    }
-  </style>
+  <link rel="stylesheet" href="./css/style.css">
 </head>
 <body>
   <div class="logo">fit<span class="accent">.mi</span></div>
   <div class="tagline">Body · Mind · Money</div>
-  <div class="status">Chantier en cours — phase 0</div>
+  <div class="status" id="status">Chargement…</div>
+  <script type="module" src="./main.js"></script>
 </body>
 </html>

@@ -4,3 +4,4 @@ node_modules/
 ios/
 .env
 *.log
+/.playwright-mcp/
