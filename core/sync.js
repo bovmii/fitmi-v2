@@ -118,6 +118,17 @@ async function mergeIncoming(row) {
     if (localAt > remoteAt) return 'skipped-local-newer';
   }
   await DB.putRaw(row.store, toLocal(row));
+  // Drop any pending outbox entry for this record: the remote we just
+  // merged is strictly newer, so our queued push would overwrite a
+  // version other devices have already seen. The next local edit will
+  // re-enqueue the record.
+  const db = await DB.open();
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction('_outbox', 'readwrite');
+    tx.objectStore('_outbox').delete(`${row.store}:${row.id}`);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
   return 'merged';
 }
 

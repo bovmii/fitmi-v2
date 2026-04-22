@@ -5,3 +5,6 @@ ios/
 .env
 *.log
 /.playwright-mcp/
+/.claude/settings.local.json
+*.png
+!**/icon-*.png

@@ -1,15 +1,16 @@
 // Entry point.
 //
 // Boot order:
-//   1. Theme.init — so the UI renders in the right palette immediately.
-//   2. DB.open    — so any subsequent put() has a store to land in.
-//   3. Migration  — pulls legacy PWA data into fitmi (only on first run).
-//   4. Auth.init  — read cached Supabase session (or set a local-only one).
-//   5. initSync   — wire online/offline listeners, drain outbox, pull.
+//   1. Theme.init        — right palette on first paint.
+//   2. DB.open           — so subsequent put() has a store to land in.
+//   3. maybeMigrate      — pulls legacy PWA data into fitmi (first run).
+//   4. Auth.init         — reads cached Supabase session.
+//   5. render()          — either the login screen or the placeholder
+//                          shell depending on auth state.
+//   6. initSync          — wires online/offline listeners, drains outbox.
 //
-// Whether Supabase is configured or not, the app remains usable: when
-// config.js is empty strings, Auth sets a synthetic local user and sync
-// is a no-op.
+// Whether Supabase is configured or not, the app remains usable: in
+// local-only mode Auth sets a synthetic user and sync is a no-op.
 
 import { Theme, showToast, confirmModal } from './core/ui.js';
 import { DB } from './core/db.js';
@@ -18,44 +19,22 @@ import { runMigrationIfNeeded, migrationStatus, markAllDirty } from './core/migr
 import { Auth } from './core/auth.js';
 import { initSync, syncNow, onSync, isOnline } from './core/sync.js';
 import { isConfigured } from './core/supabase.js';
+import { renderLogin } from './modules/auth/login.js';
+import { openPasswordChange } from './modules/auth/password-change.js';
 
-const statusEl = () => document.getElementById('status');
-const authEl = () => document.getElementById('auth-slot');
-const netEl = () => document.getElementById('net');
+const $ = (id) => document.getElementById(id);
 
-function setStatus(line) {
-  const el = statusEl();
-  if (el) el.textContent = line;
-}
-
-function renderNet() {
-  const el = netEl();
+function setNet() {
+  const el = $('net');
   if (!el) return;
   el.textContent = isOnline() ? '● en ligne' : '● hors-ligne';
   el.dataset.state = isOnline() ? 'online' : 'offline';
 }
 
-function renderAuth() {
-  const slot = authEl();
-  if (!slot) return;
-  if (!isConfigured()) {
-    slot.innerHTML = `<span class="muted">Mode local (Supabase non configuré)</span>`;
-    return;
-  }
-  if (!Auth.isAuthenticated()) {
-    slot.innerHTML = `<button class="btn-login" id="btn-login">Se connecter avec GitHub</button>`;
-    slot.querySelector('#btn-login').onclick = () => Auth.login();
-    return;
-  }
-  const u = Auth.getUser();
-  slot.innerHTML = `
-    <span class="user-pill">
-      ${u.avatar_url ? `<img src="${u.avatar_url}" alt="" class="avatar">` : ''}
-      <span>${u.name || u.login}</span>
-      <button class="btn-link" id="btn-logout">Se déconnecter</button>
-    </span>
-  `;
-  slot.querySelector('#btn-logout').onclick = () => Auth.logout();
+function isRecoveryRedirect() {
+  const hash = window.location.hash || '';
+  const query = window.location.search || '';
+  return hash.includes('type=recovery') || query.includes('reset=1') || hash === '#reset';
 }
 
 async function legacyDetected() {
@@ -86,11 +65,8 @@ async function maybeMigrate() {
     `Les importer dans fit.mi v2 ? Un backup JSON sera téléchargé avant l'import.`,
     { confirmText: 'Importer', cancelText: 'Plus tard' },
   );
-  if (!go) {
-    setStatus(`Import reporté — ${candidates.join(', ')}`);
-    return false;
-  }
-  setStatus('Migration en cours…');
+  if (!go) return false;
+
   const result = await runMigrationIfNeeded({
     onProgress: ({ step }) => {
       const label = {
@@ -99,7 +75,8 @@ async function maybeMigrate() {
         import: 'Copie dans fit.mi…',
         cleanup: 'Nettoyage…',
       }[step] || step;
-      setStatus(label);
+      const s = $('status');
+      if (s) s.textContent = label;
     },
   });
   if (result.migrated) {
@@ -111,28 +88,80 @@ async function maybeMigrate() {
   return false;
 }
 
+function renderPlaceholder(root) {
+  const u = Auth.getUser();
+  const mode = isConfigured()
+    ? (Auth.isLocalOnly() ? 'local uniquement' : 'sync active')
+    : 'local uniquement';
+  root.innerHTML = `
+    <div class="boot-screen">
+      <div class="logo">fit<span class="accent">.mi</span></div>
+      <div class="tagline">Body · Mind · Money</div>
+      <div class="status" id="status">Base ${FITMI_DB_NAME} v${FITMI_DB_VERSION} — ${mode}</div>
+      <div class="auth-slot" id="auth-slot"></div>
+      <div class="net" id="net"></div>
+    </div>
+  `;
+  const slot = $('auth-slot');
+  if (!isConfigured()) {
+    slot.innerHTML = `<span class="muted">Mode local (Supabase non configuré)</span>`;
+  } else if (u) {
+    slot.innerHTML = `
+      <div class="user-pill">
+        ${u.avatar_url ? `<img src="${u.avatar_url}" alt="" class="avatar">` : ''}
+        <span>${u.name || u.email}</span>
+      </div>
+      <div class="user-actions">
+        <button class="btn-link" id="btn-change-password">Changer mot de passe</button>
+        <span class="auth-sep">·</span>
+        <button class="btn-link" id="btn-logout">Se déconnecter</button>
+      </div>
+    `;
+    $('btn-logout').onclick = () => Auth.logout();
+    $('btn-change-password').onclick = () => openPasswordChange();
+  }
+  setNet();
+}
+
+async function render() {
+  const app = $('app');
+  if (!app) return;
+
+  if (isConfigured() && !Auth.isAuthenticated()) {
+    // Not signed in yet — show the login screen.
+    renderLogin(app);
+    return;
+  }
+
+  renderPlaceholder(app);
+}
+
 async function main() {
   Theme.init();
-  window.addEventListener('online', renderNet);
-  window.addEventListener('offline', renderNet);
-  renderNet();
+  window.addEventListener('online', setNet);
+  window.addEventListener('offline', setNet);
 
   initFitmiDB();
-
-  setStatus('Ouverture de la base fit.mi…');
   try {
     await DB.open();
   } catch (err) {
     console.error('[main] DB open failed', err);
-    setStatus('Erreur : impossible d\'ouvrir la base.');
+    const app = $('app');
+    if (app) app.innerHTML = `<div class="boot-screen"><div class="status">Erreur : impossible d'ouvrir la base.</div></div>`;
     return;
   }
 
   await maybeMigrate();
 
   await Auth.init();
-  Auth.onChange(renderAuth);
-  renderAuth();
+
+  // Auth.onChange fires once immediately with the current session, so
+  // the initial render happens from this subscription. It also handles
+  // later auth transitions (login, logout, user-updated).
+  Auth.onChange(() => {
+    if (isRecoveryRedirect()) renderLogin($('app'));
+    else render();
+  });
 
   initSync();
   onSync(({ event, payload }) => {
@@ -147,12 +176,10 @@ async function main() {
   if (Auth.isAuthenticated() && !Auth.isLocalOnly()) {
     await syncNow();
   }
-
-  const mode = isConfigured() ? (Auth.isAuthenticated() ? 'connecté' : 'en attente de login') : 'mode local';
-  setStatus(`Base ${FITMI_DB_NAME} v${FITMI_DB_VERSION} prête — ${mode}`);
 }
 
 main().catch((err) => {
   console.error('[main] fatal', err);
-  setStatus('Erreur fatale — voir console');
+  const app = $('app');
+  if (app) app.innerHTML = `<div class="boot-screen"><div class="status">Erreur fatale — voir console.</div></div>`;
 });

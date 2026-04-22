@@ -1,25 +1,18 @@
-// Authentication: Supabase Auth with GitHub OAuth.
+// Authentication: Supabase email + password.
+//
+// Single-user app. The first person who signs up owns the data;
+// subsequent signups can be disabled globally in the Supabase dashboard.
+// RLS on public.records scopes every query to auth.uid() = user_id so
+// even if someone else signed up, they'd see an empty app.
 //
 // When Supabase is unconfigured the module runs in "local-only" mode:
-// isAuthenticated() returns true, getUser() returns a synthetic local
-// user and the rest of the app behaves as if logged in. This lets the
-// user keep working on their Mac / phone before the cloud sync is
-// wired.
-//
-// When Supabase is configured the flow is:
-//   1. User clicks "Se connecter avec GitHub"
-//   2. signInWithOAuth() redirects to GitHub → back to the app
-//   3. detectSessionInUrl picks the access_token out of the URL hash
-//   4. onAuthStateChange fires with the session
-//   5. We check the GitHub login against ALLOWED_GITHUB_LOGINS; if not in
-//      the list, we sign them out immediately.
+// getUser() returns a synthetic local user and everything still works.
 
 import { client, isConfigured } from './supabase.js';
-import { ALLOWED_GITHUB_LOGINS } from '../config.js';
 
 const LOCAL_USER = {
   id: 'local',
-  login: 'local',
+  email: 'local',
   name: 'Toi (hors-ligne)',
   avatar_url: '',
   local: true,
@@ -39,8 +32,8 @@ function sessionToUser(session) {
   const meta = session.user.user_metadata || {};
   return {
     id: session.user.id,
-    login: meta.user_name || meta.preferred_username || meta.user_name || 'unknown',
-    name: meta.full_name || meta.name || meta.user_name || 'Toi',
+    email: session.user.email,
+    name: meta.display_name || meta.full_name || session.user.email?.split('@')[0] || 'Toi',
     avatar_url: meta.avatar_url || '',
     local: false,
   };
@@ -57,28 +50,12 @@ export const Auth = {
     }
     const sb = await client();
     const { data: { session } } = await sb.auth.getSession();
-    await this._applySession(session);
-    sb.auth.onAuthStateChange((_event, next) => {
-      this._applySession(next);
-    });
-  },
-
-  async _applySession(session) {
-    if (!session) {
-      _session = null;
-      notify();
-      return;
-    }
-    const login = sessionToUser(session)?.login;
-    if (!ALLOWED_GITHUB_LOGINS.includes(login)) {
-      const sb = await client();
-      await sb.auth.signOut();
-      _session = null;
-      notify();
-      return;
-    }
     _session = session;
     notify();
+    sb.auth.onAuthStateChange((_event, next) => {
+      _session = next;
+      notify();
+    });
   },
 
   isAuthenticated() {
@@ -106,19 +83,54 @@ export const Auth = {
     return () => _listeners.delete(listener);
   },
 
-  async login() {
-    if (!isConfigured()) {
-      console.warn('[auth] Supabase not configured — login is a no-op');
-      return;
-    }
+  async signUp({ email, password, name }) {
+    if (!isConfigured()) return { error: new Error('Supabase non configuré') };
     const sb = await client();
-    await sb.auth.signInWithOAuth({
-      provider: 'github',
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
       options: {
-        redirectTo: window.location.origin + window.location.pathname,
-        scopes: 'read:user',
+        data: { display_name: name || email.split('@')[0] },
+        emailRedirectTo: window.location.origin + window.location.pathname,
       },
     });
+    return { data, error };
+  },
+
+  async signIn({ email, password }) {
+    if (!isConfigured()) return { error: new Error('Supabase non configuré') };
+    const sb = await client();
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    return { data, error };
+  },
+
+  async requestPasswordReset(email) {
+    if (!isConfigured()) return { error: new Error('Supabase non configuré') };
+    const sb = await client();
+    // redirectTo points at the app root; Supabase appends #access_token=
+    // ...&type=recovery itself, and the app detects type=recovery to
+    // render the "set new password" form.
+    const { data, error } = await sb.auth.resetPasswordForEmail(email, {
+      redirectTo: window.location.origin + window.location.pathname,
+    });
+    return { data, error };
+  },
+
+  async updatePassword(newPassword) {
+    if (!isConfigured()) return { error: new Error('Supabase non configuré') };
+    const sb = await client();
+    const { data, error } = await sb.auth.updateUser({ password: newPassword });
+    return { data, error };
+  },
+
+  async updateProfile({ name, email }) {
+    if (!isConfigured()) return { error: new Error('Supabase non configuré') };
+    const sb = await client();
+    const payload = {};
+    if (email) payload.email = email;
+    if (name) payload.data = { display_name: name };
+    const { data, error } = await sb.auth.updateUser(payload);
+    return { data, error };
   },
 
   async logout() {

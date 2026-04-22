@@ -308,17 +308,19 @@ export async function markAllDirty() {
     'templates', 'weight_log', 'habits', 'completions', 'expenses',
     'subscriptions', 'savings', 'settings',
   ];
-  const stores = [...STORES, '_outbox'];
-  const tx = db.transaction(stores, 'readwrite');
-  const outbox = tx.objectStore('_outbox');
+  // One transaction per store to avoid IndexedDB auto-committing across
+  // awaits (a transaction stays alive only while there are pending
+  // requests in the same microtask).
   for (const store of STORES) {
     const keyPath = store === 'settings' ? 'key' : 'id';
-    const os = tx.objectStore(store);
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction([store, '_outbox'], 'readwrite');
+      const os = tx.objectStore(store);
+      const outbox = tx.objectStore('_outbox');
       const req = os.openCursor();
       req.onsuccess = (e) => {
         const cursor = e.target.result;
-        if (!cursor) return resolve();
+        if (!cursor) return;
         const record = cursor.value;
         outbox.put({
           key: `${store}:${record[keyPath]}`,
@@ -328,11 +330,10 @@ export async function markAllDirty() {
         });
         cursor.continue();
       };
-      req.onerror = () => resolve();
+      req.onerror = () => reject(req.error);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error);
     });
   }
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
-  });
 }
