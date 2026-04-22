@@ -2344,3 +2344,240 @@ textarea:focus { outline: none; border-color: var(--accent); }
   text-align: center;
   color: rgba(255, 255, 255, 0.85);
 }
+
+/* ============================================================
+   Training
+   ============================================================ */
+
+.training-page { display: flex; flex-direction: column; gap: 16px; }
+.training-idle { display: flex; flex-direction: column; gap: 14px; }
+
+.training-card {
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 6px;
+}
+.training-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+.training-card-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.training-card-date {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 2px;
+  text-transform: lowercase;
+}
+.training-card-duration {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.training-card-stats {
+  margin-top: 6px;
+  display: flex;
+  gap: 10px;
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+}
+
+/* Active workout view */
+.workout-active { display: flex; flex-direction: column; gap: 14px; }
+.workout-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+.workout-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.workout-elapsed {
+  font-family: 'Outfit', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  margin-top: 2px;
+}
+
+.ex-group {
+  padding: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.ex-group-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.ex-group-name {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.ex-group-muscle {
+  font-size: 11px;
+  color: var(--accent);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  background: var(--accent-dim);
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.set-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.set-row {
+  display: grid;
+  grid-template-columns: 28px 72px auto 72px auto auto;
+  align-items: center;
+  gap: 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 6px 4px 10px;
+}
+.set-num {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.set-row input {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 6px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  outline: none;
+}
+.set-row input:focus {
+  background: var(--card);
+  border-radius: 6px;
+}
+.set-sep, .set-unit {
+  font-size: 12.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.ex-group .settings-btn { margin-bottom: 0; padding: 10px; justify-content: center; }
+
+/* Exercise picker rows */
+.ex-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+.ex-pick {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color 0.12s, background 0.12s;
+}
+.ex-pick:hover { border-color: var(--accent); background: var(--accent-dim); }
+.ex-pick-name { flex: 1; font-size: 14px; font-weight: 500; }
+.ex-pick-tag {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  background: var(--border);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Rest timer floating banner */
+.rest-timer {
+  position: fixed;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 80;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+  animation: fadeInUp 0.2s ease;
+  max-width: calc(100vw - 24px);
+}
+.rest-timer.done {
+  animation: pulse-accent 0.6s ease;
+  border-color: var(--success);
+}
+@keyframes pulse-accent {
+  0% { transform: translateX(-50%) scale(1); }
+  50% { transform: translateX(-50%) scale(1.06); }
+  100% { transform: translateX(-50%) scale(1); }
+}
+.rest-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.rest-icon { color: var(--accent); display: inline-flex; }
+.rest-label { color: var(--text-secondary); }
+.rest-count {
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  color: var(--accent);
+}
+.rest-btn {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.rest-btn:hover { background: var(--accent-dim); border-color: var(--accent); }

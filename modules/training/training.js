@@ -1,11 +1,29 @@
-// Training tab. Port of the legacy training.js in phase 4: workouts,
-// exercises library, templates, sets, rest timer, WGER explorer.
+// Training tab entry point.
+//
+// Phase 4d1 scope is one view: the workout page. Phase 4d2 adds a
+// second sub-tab (Historique). The sub-tab scaffold is already here
+// so 4d2 can slot in without touching this file.
 
-export function mount(root) {
+import { ensureExercisesSeeded } from './data.js';
+import { renderWorkoutView } from './workout-view.js';
+
+export async function mount(root) {
   root.innerHTML = `
-    <div class="placeholder">
-      <h1 class="placeholder-title">Training</h1>
-      <p class="placeholder-sub">Séances, exercices, templates — en chantier (phase 4).</p>
+    <div class="training-page">
+      <div class="page-header">
+        <h1 class="page-title">Training</h1>
+      </div>
+      <div data-host></div>
     </div>
   `;
+
+  // First-time setup: pre-seed the exercise library if empty.
+  await ensureExercisesSeeded();
+
+  const host = root.querySelector('[data-host]');
+  let ref = await renderWorkoutView(host);
+
+  return {
+    stop: () => ref?.stop?.(),
+  };
 }
