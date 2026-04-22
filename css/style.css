@@ -1878,3 +1878,152 @@ body {
   color: var(--text-muted);
   font-weight: 500;
 }
+
+/* ----- Water tracker ----- */
+.water-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+}
+.water-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+}
+.water-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 700;
+  color: #3b82f6;
+}
+.water-count {
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+.water-count span { color: var(--text-muted); font-size: 11.5px; }
+.water-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.water-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid #3b82f6;
+  color: #3b82f6;
+  background: transparent;
+  transition: background 0.12s;
+}
+.water-chip.done {
+  background: #3b82f6;
+  color: white;
+}
+.water-chip-more {
+  font-size: 11px;
+  color: var(--text-muted);
+  align-self: center;
+  margin-left: 4px;
+  font-weight: 600;
+}
+.water-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+.water-actions .settings-btn {
+  justify-content: center;
+  margin-bottom: 0;
+  padding: 10px;
+}
+
+/* ----- Fasting ----- */
+.fasting-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  align-items: stretch;
+}
+.fasting-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.fasting-head .water-title { color: var(--accent); }
+
+.fasting-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 12px 8px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  border-radius: 10px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.preset-btn:hover { border-color: var(--accent); background: var(--accent-dim); }
+.preset-btn strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.preset-btn span {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.fasting-circle {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  margin: 4px auto;
+}
+.fasting-bg { stroke: var(--border); }
+.fasting-fg {
+  stroke: var(--accent);
+  transition: stroke-dashoffset 0.6s ease;
+}
+.fasting-text {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.fasting-elapsed {
+  font-family: 'Outfit', sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.fasting-remain {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+.fasting-remain strong { color: var(--accent); font-weight: 700; }

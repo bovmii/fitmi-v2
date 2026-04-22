@@ -105,3 +105,103 @@ export async function setTdeeProfile(profile) {
 }
 
 function round1(n) { return Math.round(n * 10) / 10; }
+
+// ---- Water ----
+
+export const DEFAULT_GLASS_ML = 250;
+export const DEFAULT_WATER_GOAL_ML = 2000;
+
+export async function getWaterGoalMl() {
+  return (await DB.getSetting(SETTINGS_KEYS.NUTRITION_WATER_GOAL)) || DEFAULT_WATER_GOAL_ML;
+}
+
+export async function setWaterGoalMl(ml) {
+  return DB.setSetting(SETTINGS_KEYS.NUTRITION_WATER_GOAL, Number(ml) || DEFAULT_WATER_GOAL_ML);
+}
+
+export async function getWaterLogForDate(date = todayStr()) {
+  const rows = await DB.getByIndex('water_log', 'date', date);
+  return rows.filter((r) => !r.deletedAt).sort((a, b) => (a.loggedAt || '').localeCompare(b.loggedAt || ''));
+}
+
+export async function getTodayWaterMl(date = todayStr()) {
+  const rows = await getWaterLogForDate(date);
+  return rows.reduce((s, r) => s + (r.amount || 0), 0);
+}
+
+export async function logGlass(amount = DEFAULT_GLASS_ML, date = todayStr()) {
+  const entry = {
+    id: uuid(),
+    date,
+    amount: Number(amount) || DEFAULT_GLASS_ML,
+    loggedAt: new Date().toISOString(),
+  };
+  await DB.put('water_log', entry);
+  return entry;
+}
+
+// Undo the most recent glass of the given day.
+export async function removeLastGlass(date = todayStr()) {
+  const rows = await getWaterLogForDate(date);
+  if (rows.length === 0) return null;
+  const last = rows[rows.length - 1];
+  await DB.delete('water_log', last.id);
+  return last;
+}
+
+// ---- Fasting ----
+
+export const FASTING_PRESETS = [
+  { key: '14_10', label: '14:10', hours: 14 },
+  { key: '16_8',  label: '16:8',  hours: 16 },
+  { key: '18_6',  label: '18:6',  hours: 18 },
+  { key: '20_4',  label: '20:4',  hours: 20 },
+];
+
+export async function getActiveFast() {
+  const row = await DB.getSetting(SETTINGS_KEYS.NUTRITION_FASTING);
+  if (!row?.startedAt) return null;
+  return row;
+}
+
+export async function startFast({ hours, presetKey }) {
+  const fast = {
+    startedAt: new Date().toISOString(),
+    targetHours: Number(hours) || 16,
+    presetKey: presetKey || null,
+  };
+  await DB.setSetting(SETTINGS_KEYS.NUTRITION_FASTING, fast);
+  return fast;
+}
+
+export async function endFast() {
+  const active = await getActiveFast();
+  if (!active) return null;
+  const endedAt = new Date().toISOString();
+  const durationMinutes = Math.round(
+    (new Date(endedAt) - new Date(active.startedAt)) / 60000,
+  );
+  const history = (await DB.getSetting('nutrition.fastingHistory', [])) || [];
+  history.unshift({
+    startedAt: active.startedAt,
+    endedAt,
+    durationMinutes,
+    targetHours: active.targetHours,
+    presetKey: active.presetKey || null,
+  });
+  // Cap at 30 so we don't bloat the setting row.
+  const trimmed = history.slice(0, 30);
+  await DB.setSetting('nutrition.fastingHistory', trimmed);
+  await DB.setSetting(SETTINGS_KEYS.NUTRITION_FASTING, null);
+  return {
+    startedAt: active.startedAt,
+    endedAt,
+    durationMinutes,
+    targetHours: active.targetHours,
+    success: durationMinutes / 60 >= active.targetHours,
+  };
+}
+
+export async function getFastingHistory() {
+  return (await DB.getSetting('nutrition.fastingHistory', [])) || [];
+}

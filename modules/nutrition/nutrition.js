@@ -19,6 +19,8 @@ import {
 } from './data.js';
 import { openTdeeModal } from './tdee.js';
 import { openAddFood } from './add.js';
+import { renderWater } from './water.js';
+import { renderFasting } from './fasting.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -48,6 +50,10 @@ export async function mount(root) {
       <section class="cal-ring-wrap" data-ring></section>
 
       <section class="macros-wrap" data-macros></section>
+
+      <section class="water-section" data-water></section>
+
+      <section class="fasting-section" data-fasting></section>
 
       <button class="fab-cta" data-add-food>
         ${icon('plus', { size: 20 })}<span>Ajouter un aliment</span>
@@ -79,6 +85,8 @@ export async function mount(root) {
     if (r?.logged) await refresh();
   };
 
+  let fastingRef = null;
+
   await refresh();
 
   async function refresh() {
@@ -96,6 +104,11 @@ export async function mount(root) {
     renderRing(totals, targets);
     renderMacros(totals, targets);
     renderLog(entries);
+
+    // Water + fasting: remount cleanly so internal RAF loops reset.
+    await renderWater(root.querySelector('[data-water]'), { date: currentDate });
+    if (fastingRef?.stop) fastingRef.stop();
+    fastingRef = await renderFasting(root.querySelector('[data-fasting]'));
   }
 
   function renderRing(totals, targets) {
