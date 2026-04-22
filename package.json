@@ -1,0 +1,28 @@
+{
+  "name": "fitmi-v2",
+  "version": "1.0.0",
+  "description": "Life stack — nutrition, training, habits, budget",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "build": "node scripts/build-dist.js",
+    "sync": "npm run build && npx cap sync ios",
+    "open:ios": "npm run sync && npx cap open ios"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bovmii/fitmi-v2.git"
+  },
+  "homepage": "https://github.com/bovmii/fitmi-v2#readme",
+  "dependencies": {
+    "@capacitor/app": "^8.1.0",
+    "@capacitor/cli": "^8.3.1",
+    "@capacitor/core": "^8.3.1",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/ios": "^8.3.1",
+    "@capacitor/local-notifications": "^8.0.2",
+    "@capacitor/preferences": "^8.0.1",
+    "@capacitor/status-bar": "^8.0.2",
+    "capacitor-health": "^8.1.0"
+  }
+}

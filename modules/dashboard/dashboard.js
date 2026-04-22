@@ -27,6 +27,7 @@ import { formatEUR } from '../budget/categories.js';
 import { openAddExpense } from '../budget/add.js';
 import { getDayTotals, getNutritionTargets } from '../nutrition/data.js';
 import { openAddFood } from '../nutrition/add.js';
+import { isAvailable as healthAvailable, readStepsToday, readActiveCaloriesToday, requestPermissions as requestHealthPerms } from '../../core/health.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -80,6 +81,11 @@ export async function mount(root) {
       <section class="dash-section dash-placeholder-card">
         <div class="dash-section-head"><h2>Training</h2></div>
         <div class="dash-pending">${icon('dumbbell', { size: 18 })}<span>Séance du jour — phase 4d</span></div>
+      </section>
+
+      <section class="dash-section" data-section="health" hidden>
+        <div class="dash-section-head"><h2>Activité</h2></div>
+        <div class="dash-health-card" data-health-card></div>
       </section>
 
       <section class="dash-section" data-section="budget">
@@ -164,6 +170,34 @@ export async function mount(root) {
   await refreshHabits();
   await refreshBudget();
   await refreshNutrition();
+  await refreshHealth();
+
+  async function refreshHealth() {
+    const section = root.querySelector('[data-section="health"]');
+    if (!section) return;
+    const ok = await healthAvailable();
+    if (!ok) { section.hidden = true; return; }
+    section.hidden = false;
+    const perms = await requestHealthPerms();
+    const [steps, active] = await Promise.all([
+      readStepsToday().catch(() => 0),
+      readActiveCaloriesToday().catch(() => 0),
+    ]);
+    const card = section.querySelector('[data-health-card]');
+    card.innerHTML = `
+      <div class="dash-nutri-top">
+        <div>
+          <div class="dash-budget-label">Pas</div>
+          <div class="dash-budget-value">${Math.round(steps).toLocaleString('fr-FR')}</div>
+        </div>
+        <div>
+          <div class="dash-budget-label">Cal. actives</div>
+          <div class="dash-budget-value">${Math.round(active)}</div>
+        </div>
+      </div>
+      ${perms.granted ? '' : `<div class="settings-hint">Autorise l'accès à Santé dans Réglages → fit.mi pour voir tes données.</div>`}
+    `;
+  }
 
   async function refreshNutrition() {
     const card = root.querySelector('[data-nutri-card]');

@@ -1879,6 +1879,16 @@ body {
   font-weight: 500;
 }
 
+.dash-health-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ----- Water tracker ----- */
 .water-section {
   display: flex;

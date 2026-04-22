@@ -10,7 +10,6 @@ permissions:
   pages: write
   id-token: write
 
-# One deployment at a time; cancel any queued run when a newer push comes in.
 concurrency:
   group: pages
   cancel-in-progress: true
@@ -25,13 +24,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Assemble just the web assets into a scratch directory so the
+      # iOS project, node_modules and SQL schemas never hit the Pages
+      # artifact. Everything the browser needs ships; nothing else.
+      - name: Collect web artefact
+        run: |
+          mkdir -p _pages
+          cp index.html main.js config.js manifest.json .nojekyll _pages/
+          cp -r css core modules _pages/
+
       - name: Configure Pages
         uses: actions/configure-pages@v5
 
       - name: Upload site artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _pages
 
       - name: Deploy
         id: deployment

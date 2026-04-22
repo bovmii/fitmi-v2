@@ -1,10 +1,19 @@
 _sources/
 node_modules/
 .DS_Store
-ios/
 .env
 *.log
 /.playwright-mcp/
 /.claude/settings.local.json
 *.png
 !**/icon-*.png
+
+# Capacitor iOS — generated artefacts (users rebuild with `npm run sync`)
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/App/App/public/
+ios/DerivedData/
+ios/build/
+*.xcuserdata/
+xcuserdata/
+dist/

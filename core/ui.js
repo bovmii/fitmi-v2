@@ -2,6 +2,8 @@
 // None of these depend on a specific DOM structure — the toast element is
 // created on demand, the modal is spawned as a portal on <body>.
 
+import { haptic as nativeHaptic, applyStatusBarTheme } from './native.js';
+
 const THEME_KEY = 'fitmi.theme';
 
 // ----- Theme -----
@@ -23,6 +25,7 @@ export const Theme = {
     document.documentElement.setAttribute('data-theme', effective);
     const meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', effective === 'light' ? '#f5f2ec' : '#0a0a0a');
+    applyStatusBarTheme(effective).catch(() => {});
   },
 
   set(mode) {
@@ -96,11 +99,11 @@ export function confirmModal(message, { confirmText = 'Confirmer', cancelText = 
 }
 
 // ----- Haptics -----
-// Thin wrapper around navigator.vibrate. When the app is later wrapped in
-// Capacitor, core/haptics.js can shadow this with @capacitor/haptics.
+// Routes through core/native.js — real Capacitor Haptics on iOS,
+// navigator.vibrate fallback on the web.
 
-export function haptic(pattern = 10) {
-  if (navigator.vibrate) navigator.vibrate(pattern);
+export function haptic(style = 'light') {
+  nativeHaptic(style).catch(() => {});
 }
 
 // ----- Utility -----

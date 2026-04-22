@@ -1,0 +1,15 @@
+{
+  "appId": "com.bovmii.fitmi",
+  "appName": "fit.mi",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "ios": {
+    "scheme": "fit.mi",
+    "contentInset": "automatic"
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "iconColor": "#c4a87a"
+    }
+  }
+}
