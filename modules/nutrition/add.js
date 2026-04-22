@@ -1,14 +1,20 @@
-// Add food modal. Two tabs:
+// Add food modal. Three entry points:
 //   "Recherche" — filter the local food database, pick an item, enter
 //                 quantity in grams, logs with scaled macros.
 //   "Manuel"   — free-form name + kcal + macros + quantity (stored as
 //                 "per100g" = exactly what the user typed, so later
 //                 quantity edits scale consistently).
+//   "Scanner"  — inline button that opens the camera scanner, queries
+//                 Open Food Facts with the barcode, and prefills the
+//                 Manuel tab with the product's per-100g macros.
 
 import { icon } from '../../core/icons.js';
+import { showToast } from '../../core/ui.js';
 import { FOODS, FOOD_CATEGORIES, searchFoods } from './foods-db.js';
 import { logFood } from './data.js';
 import { todayStr } from '../../core/date.js';
+import { openScanner } from './scanner.js';
+import { lookupBarcode } from './off-api.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -34,6 +40,10 @@ export function openAddFood({ date = todayStr() } = {}) {
             <button type="button" class="icon-btn" data-close>${icon('x', { size: 22 })}</button>
           </div>
           <div class="drawer-body">
+            <button type="button" class="scan-btn" data-scan>
+              ${icon('search', { size: 16 })}<span>Scanner un code-barres</span>
+            </button>
+
             <div class="settings-segment" data-tabs>
               <button type="button" data-tab="search" class="${state.tab === 'search' ? 'active' : ''}">Recherche</button>
               <button type="button" data-tab="manual" class="${state.tab === 'manual' ? 'active' : ''}">Manuel</button>
@@ -146,6 +156,31 @@ export function openAddFood({ date = todayStr() } = {}) {
       overlay.querySelectorAll('[data-tab]').forEach((b) => {
         b.onclick = () => { state.tab = b.dataset.tab; state.selected = null; refresh(); };
       });
+
+      overlay.querySelector('[data-scan]').onclick = async () => {
+        const code = await openScanner();
+        if (!code) return;
+        showToast(`Recherche du code ${code}…`);
+        const result = await lookupBarcode(code);
+        if (result.ok) {
+          state.tab = 'manual';
+          state.manual = {
+            name: [result.brand, result.name].filter(Boolean).join(' · ').trim() || `Produit ${code}`,
+            kcal: String(result.kcal),
+            p:    String(result.p),
+            c:    String(result.c),
+            f:    String(result.f),
+            quantity: 100,
+          };
+          refresh();
+          showToast(`Trouvé : ${result.name || code}`);
+        } else {
+          state.tab = 'manual';
+          state.manual = { name: `Code ${code}`, kcal: '', p: '', c: '', f: '', quantity: 100 };
+          refresh();
+          showToast('Produit introuvable — renseigne les valeurs manuellement.');
+        }
+      };
 
       if (state.tab === 'search') {
         if (state.selected) {
