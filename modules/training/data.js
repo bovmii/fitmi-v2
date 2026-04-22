@@ -193,3 +193,78 @@ export async function getWorkoutComposition(workoutId) {
 export function computeVolume(sets) {
   return (sets || []).reduce((s, r) => s + (r.reps || 0) * (r.weight || 0), 0);
 }
+
+// ---- Templates ----
+
+export async function getAllTemplates() {
+  const rows = await DB.getAllActive('templates');
+  return rows.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'fr'));
+}
+
+export async function getTemplate(id) {
+  const row = await DB.get('templates', id);
+  return row && !row.deletedAt ? row : null;
+}
+
+export async function saveTemplate({ id, name, exercises, createdAt }) {
+  const tmpl = {
+    id: id || uuid(),
+    name: (name || '').trim(),
+    exercises: (exercises || []).map((ex) => ({
+      exerciseId: ex.exerciseId,
+      exerciseName: ex.exerciseName,
+      muscleGroup: ex.muscleGroup || '',
+      sets: (ex.sets || []).map((s) => ({
+        reps: Number(s.reps) || 0,
+        weight: Number(s.weight) || 0,
+      })),
+    })),
+    createdAt: createdAt || new Date().toISOString(),
+  };
+  await DB.put('templates', tmpl);
+  return tmpl;
+}
+
+export async function deleteTemplate(id) {
+  await DB.delete('templates', id);
+}
+
+// Derive a template from the current composition of a workout (strip
+// zero-reps-AND-zero-weight placeholder sets, keep exercises that have
+// at least one real set).
+export async function buildTemplateFromWorkout(workoutId) {
+  const groups = await getWorkoutComposition(workoutId);
+  const exercises = groups.map((g) => {
+    const sets = g.sets.filter((s) => (s.reps || 0) > 0 || (s.weight || 0) > 0);
+    return {
+      exerciseId: g.exercise.id,
+      exerciseName: g.exercise.name,
+      muscleGroup: g.exercise.muscleGroup || '',
+      sets: sets.map((s) => ({ reps: s.reps, weight: s.weight })),
+    };
+  }).filter((ex) => ex.sets.length > 0);
+  return exercises;
+}
+
+// Start a new workout from a template: creates the workout, then
+// inserts every template set as a real set. Returns the workout.
+export async function startFromTemplate(templateId) {
+  const tmpl = await getTemplate(templateId);
+  if (!tmpl) return null;
+  const workout = await startWorkout();
+  for (const ex of tmpl.exercises || []) {
+    // Skip if the exercise has been deleted since the template was saved.
+    const live = await getExercise(ex.exerciseId);
+    if (!live) continue;
+    const sets = ex.sets && ex.sets.length ? ex.sets : [{ reps: 0, weight: 0 }];
+    for (const s of sets) {
+      await addSet({
+        workoutId: workout.id,
+        exerciseId: ex.exerciseId,
+        reps: s.reps,
+        weight: s.weight,
+      });
+    }
+  }
+  return workout;
+}

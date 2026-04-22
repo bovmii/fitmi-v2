@@ -2581,3 +2581,105 @@ textarea:focus { outline: none; border-color: var(--accent); }
   cursor: pointer;
 }
 .rest-btn:hover { background: var(--accent-dim); border-color: var(--accent); }
+
+/* History detail drawer */
+.workout-summary {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.summary-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 6px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  text-align: center;
+}
+.summary-cell span {
+  font-size: 10.5px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+.summary-cell strong {
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.history-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  color: var(--text);
+  transition: border-color 0.12s;
+}
+.history-card:hover { border-color: var(--accent); }
+
+.set-row.readonly {
+  grid-template-columns: 28px 1fr auto 1fr auto;
+  padding: 10px 12px;
+}
+.set-readonly {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* Templates */
+.template-chip-row {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin: 0 -18px;
+  padding-left: 18px;
+  padding-right: 18px;
+  scrollbar-width: none;
+}
+.template-chip-row::-webkit-scrollbar { display: none; }
+.template-chip {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  border-radius: 12px;
+  cursor: pointer;
+  min-width: 140px;
+  transition: border-color 0.12s, background 0.12s;
+}
+.template-chip:hover { border-color: var(--accent); background: var(--accent-dim); }
+.template-chip-name {
+  font-weight: 700;
+  font-size: 13.5px;
+  letter-spacing: -0.01em;
+}
+.template-chip-meta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.template-actions {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.template-actions .settings-btn { margin-bottom: 0; justify-content: center; }

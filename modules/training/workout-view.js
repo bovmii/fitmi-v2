@@ -8,7 +8,8 @@ import { formatDateFr } from '../../core/date.js';
 import {
   getActiveWorkout, startWorkout, finishWorkout, cancelWorkout,
   getRecentWorkouts, getWorkoutComposition, computeVolume,
-  addSet, updateSet, deleteSet,
+  addSet, updateSet, deleteSet, getAllTemplates, startFromTemplate,
+  buildTemplateFromWorkout, saveTemplate,
 } from './data.js';
 import { openExercisePicker } from './exercises-picker.js';
 import { startRestTimer, stopRestTimer } from './rest-timer.js';
@@ -42,10 +43,21 @@ export async function renderWorkoutView(host) {
   }
 
   async function renderIdle() {
-    const recent = await getRecentWorkouts(6);
+    const [recent, templates] = await Promise.all([getRecentWorkouts(6), getAllTemplates()]);
     host.innerHTML = `
       <div class="training-idle">
         <button class="fab-cta" data-start>${icon('plus', { size: 20 })}<span>Commencer une séance</span></button>
+        ${templates.length > 0 ? `
+          <div class="section-head" style="margin-top:4px;"><h2>À partir d'un modèle</h2></div>
+          <div class="template-chip-row" data-templates>
+            ${templates.slice(0, 6).map((t) => `
+              <button class="template-chip" data-template="${t.id}">
+                <span class="template-chip-name">${escapeHtml(t.name)}</span>
+                <span class="template-chip-meta">${(t.exercises || []).length} ex.</span>
+              </button>
+            `).join('')}
+          </div>
+        ` : ''}
         <div class="section-head" style="margin-top:8px;"><h2>Récentes</h2></div>
         <div data-recent></div>
       </div>
@@ -54,6 +66,12 @@ export async function renderWorkoutView(host) {
       await startWorkout();
       await render();
     };
+    host.querySelectorAll('[data-template]').forEach((b) => {
+      b.onclick = async () => {
+        await startFromTemplate(b.dataset.template);
+        await render();
+      };
+    });
 
     const recentHost = host.querySelector('[data-recent]');
     if (recent.length === 0) {
@@ -130,6 +148,23 @@ export async function renderWorkoutView(host) {
       stopRestTimer();
       const finished = await finishWorkout(active.id);
       showToast(`Séance terminée — ${groups.length} exercice${groups.length > 1 ? 's' : ''}, ${totalSets} série${totalSets > 1 ? 's' : ''}`);
+      // Offer to save as template if there's meaningful content.
+      if (totalSets >= 3) {
+        const save = await confirmModal(
+          'Enregistrer cette séance comme modèle pour la rejouer plus tard ?',
+          { confirmText: 'Enregistrer', cancelText: 'Non merci' },
+        );
+        if (save) {
+          const name = prompt('Nom du modèle :', [...new Set(groups.map((g) => g.exercise.muscleGroup))].join(' · ') || 'Séance');
+          if (name) {
+            const exercises = await buildTemplateFromWorkout(finished.id);
+            if (exercises.length > 0) {
+              await saveTemplate({ name, exercises });
+              showToast(`Modèle "${name}" créé.`);
+            }
+          }
+        }
+      }
       await render();
     };
 
