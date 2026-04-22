@@ -22,6 +22,7 @@ import { isConfigured } from './core/supabase.js';
 import { renderLogin } from './modules/auth/login.js';
 import { renderShell } from './modules/shell/shell.js';
 import { initHabitAutoTriggers } from './modules/habits/auto-triggers.js';
+import { initWidgetRefresh } from './core/widgets.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -122,6 +123,7 @@ async function main() {
 
   initSync();
   initHabitAutoTriggers();
+  initWidgetRefresh();
   onSync(({ event, payload }) => {
     if (event === 'sync.push.done' || event === 'sync.pull.done') {
       const p = payload?.pushed ?? payload?.pulled ?? 0;

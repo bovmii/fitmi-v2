@@ -7,6 +7,7 @@
 
 import { icon } from '../../core/icons.js';
 import { Bus } from '../../core/bus.js';
+import { pushWidgetData } from '../../core/widgets.js';
 import {
   DEFAULT_GLASS_ML, DEFAULT_WATER_GOAL_ML,
   getTodayWaterMl, getWaterGoalMl, logGlass, removeLastGlass,
@@ -62,6 +63,7 @@ export async function renderWater(host, { date, onChange } = {}) {
       await logGlass(DEFAULT_GLASS_ML, date);
       consumed += DEFAULT_GLASS_ML;
       render();
+      pushWidgetData({ water: { current: consumedCups(), target: totalCups() } });
       if (!lastReachedGoal && consumed >= goal) {
         lastReachedGoal = true;
         Bus.emit('water.goal_reached', { date, consumed, goal });
@@ -74,6 +76,7 @@ export async function renderWater(host, { date, onChange } = {}) {
         consumed = Math.max(0, consumed - (removed.amount || DEFAULT_GLASS_ML));
         if (consumed < goal) lastReachedGoal = false;
         render();
+        pushWidgetData({ water: { current: consumedCups(), target: totalCups() } });
         onChange?.();
       }
     };
