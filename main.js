@@ -14,22 +14,15 @@
 
 import { Theme, showToast, confirmModal } from './core/ui.js';
 import { DB } from './core/db.js';
-import { initFitmiDB, FITMI_DB_NAME, FITMI_DB_VERSION } from './core/schema.js';
+import { initFitmiDB } from './core/schema.js';
 import { runMigrationIfNeeded, migrationStatus, markAllDirty } from './core/migration.js';
 import { Auth } from './core/auth.js';
-import { initSync, syncNow, onSync, isOnline } from './core/sync.js';
+import { initSync, syncNow, onSync } from './core/sync.js';
 import { isConfigured } from './core/supabase.js';
 import { renderLogin } from './modules/auth/login.js';
-import { openPasswordChange } from './modules/auth/password-change.js';
+import { renderShell } from './modules/shell/shell.js';
 
 const $ = (id) => document.getElementById(id);
-
-function setNet() {
-  const el = $('net');
-  if (!el) return;
-  el.textContent = isOnline() ? '● en ligne' : '● hors-ligne';
-  el.dataset.state = isOnline() ? 'online' : 'offline';
-}
 
 function isRecoveryRedirect() {
   const hash = window.location.hash || '';
@@ -88,41 +81,6 @@ async function maybeMigrate() {
   return false;
 }
 
-function renderPlaceholder(root) {
-  const u = Auth.getUser();
-  const mode = isConfigured()
-    ? (Auth.isLocalOnly() ? 'local uniquement' : 'sync active')
-    : 'local uniquement';
-  root.innerHTML = `
-    <div class="boot-screen">
-      <div class="logo">fit<span class="accent">.mi</span></div>
-      <div class="tagline">Body · Mind · Money</div>
-      <div class="status" id="status">Base ${FITMI_DB_NAME} v${FITMI_DB_VERSION} — ${mode}</div>
-      <div class="auth-slot" id="auth-slot"></div>
-      <div class="net" id="net"></div>
-    </div>
-  `;
-  const slot = $('auth-slot');
-  if (!isConfigured()) {
-    slot.innerHTML = `<span class="muted">Mode local (Supabase non configuré)</span>`;
-  } else if (u) {
-    slot.innerHTML = `
-      <div class="user-pill">
-        ${u.avatar_url ? `<img src="${u.avatar_url}" alt="" class="avatar">` : ''}
-        <span>${u.name || u.email}</span>
-      </div>
-      <div class="user-actions">
-        <button class="btn-link" id="btn-change-password">Changer mot de passe</button>
-        <span class="auth-sep">·</span>
-        <button class="btn-link" id="btn-logout">Se déconnecter</button>
-      </div>
-    `;
-    $('btn-logout').onclick = () => Auth.logout();
-    $('btn-change-password').onclick = () => openPasswordChange();
-  }
-  setNet();
-}
-
 async function render() {
   const app = $('app');
   if (!app) return;
@@ -133,13 +91,11 @@ async function render() {
     return;
   }
 
-  renderPlaceholder(app);
+  renderShell(app);
 }
 
 async function main() {
   Theme.init();
-  window.addEventListener('online', setNet);
-  window.addEventListener('offline', setNet);
 
   initFitmiDB();
   try {
