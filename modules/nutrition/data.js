@@ -4,6 +4,7 @@ import { DB } from '../../core/db.js';
 import { uuid } from '../../core/ids.js';
 import { SETTINGS_KEYS } from '../../core/schema.js';
 import { todayStr } from '../../core/date.js';
+import { Bus } from '../../core/bus.js';
 
 // ---- Food log ----
 
@@ -34,6 +35,19 @@ export async function logFood({ name, quantity, per100g, date, customKey }) {
     customKey: customKey || null,
   };
   await DB.put('food_log', entry);
+  // After the write, emit a calorie-goal event once per day if the
+  // running total just crossed into the ±10 % target window. Phase 5
+  // habit auto-triggers consume this.
+  try {
+    const targets = await getNutritionTargets();
+    if (targets.kcal > 0) {
+      const totals = await getDayTotals(entry.date);
+      const pct = Math.abs(totals.kcal - targets.kcal) / targets.kcal;
+      if (pct <= 0.1) {
+        Bus.emit('calories.goal_ok', { date: entry.date, kcal: totals.kcal, target: targets.kcal });
+      }
+    }
+  } catch {}
   return entry;
 }
 

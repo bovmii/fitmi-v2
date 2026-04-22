@@ -9,6 +9,7 @@ import {
   getShoppingForWeek, addShoppingItem, toggleShoppingItem,
   deleteShoppingItem, clearCheckedShopping, importWeekIngredients,
 } from './data.js';
+import { openShoppingCheckout } from './shopping-checkout.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -43,6 +44,10 @@ export async function renderShopping(host, { onChange } = {}) {
       </div>
 
       <div data-list></div>
+
+      <button class="fab-cta" data-checkout style="margin-top:10px;">
+        ${icon('wallet', { size: 18 })}<span>J'ai fait les courses</span>
+      </button>
     </div>
   `;
 
@@ -74,6 +79,11 @@ export async function renderShopping(host, { onChange } = {}) {
     if (!ok) return;
     await clearCheckedShopping(weekKey);
     await refresh();
+  };
+
+  host.querySelector('[data-checkout]').onclick = async () => {
+    const r = await openShoppingCheckout({ weekKey });
+    if (r?.logged) { await refresh(); onChange?.(); }
   };
 
   await refresh();

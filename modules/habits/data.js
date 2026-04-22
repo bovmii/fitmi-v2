@@ -6,6 +6,7 @@
 import { DB } from '../../core/db.js';
 import { uuid } from '../../core/ids.js';
 import { todayStr, parseDate, addDays } from '../../core/date.js';
+import { adjustSavings } from '../budget/data.js';
 
 export async function getAllHabits({ includeArchived = false } = {}) {
   const rows = await DB.getAllActive('habits');
@@ -40,20 +41,48 @@ export async function isCompletedToday(habitId) {
 }
 
 // Tap a habit: if no active completion for today, create one; otherwise
-// soft-delete the existing one.
+// soft-delete the existing one. When the habit is a `savingsBoost`
+// variant, the linked savings goal's saved amount is adjusted up/down
+// by the configured virtualAmount.
 export async function toggleHabit(habitId) {
   const today = todayStr();
   const rows = await DB.getByIndex('completions', 'habitDate', [habitId, today]);
   const active = rows.find((c) => !c.deletedAt);
+  const habit = await getHabit(habitId);
+
   if (active) {
     await DB.delete('completions', active.id);
+    if (habit?.savingsBoost && habit.linkedGoalId && habit.virtualAmount) {
+      await adjustSavings(habit.linkedGoalId, -Number(habit.virtualAmount));
+    }
     return { completed: false };
   }
+
   await DB.put('completions', {
     id: uuid(),
     habitId,
     date: today,
     completedAt: new Date().toISOString(),
+  });
+  if (habit?.savingsBoost && habit.linkedGoalId && habit.virtualAmount) {
+    await adjustSavings(habit.linkedGoalId, Number(habit.virtualAmount));
+  }
+  return { completed: true };
+}
+
+// Idempotent completion: marks the habit as done today if it isn't
+// already. Used by the auto-trigger bus listeners so the same
+// event replayed multiple times can't create duplicate completions.
+export async function markCompletedToday(habitId) {
+  const today = todayStr();
+  const rows = await DB.getByIndex('completions', 'habitDate', [habitId, today]);
+  if (rows.some((c) => !c.deletedAt)) return { alreadyCompleted: true };
+  await DB.put('completions', {
+    id: uuid(),
+    habitId,
+    date: today,
+    completedAt: new Date().toISOString(),
+    autoCompleted: true,
   });
   return { completed: true };
 }
@@ -71,6 +100,11 @@ export async function saveHabit(data) {
     order: data.order ?? existing?.order ?? Date.now(),
     archived: Boolean(data.archived),
     autoTrigger: data.autoTrigger || null,
+    // Savings-boost: each check nudges a linked savings goal up by
+    // virtualAmount €. Purely a motivator — no real money moves.
+    savingsBoost: Boolean(data.savingsBoost),
+    linkedGoalId: data.linkedGoalId || null,
+    virtualAmount: Number(data.virtualAmount) || 0,
     createdAt: existing?.createdAt || new Date().toISOString(),
   };
   await DB.put('habits', habit);

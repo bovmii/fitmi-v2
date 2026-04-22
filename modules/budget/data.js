@@ -6,6 +6,7 @@ import { DB } from '../../core/db.js';
 import { uuid } from '../../core/ids.js';
 import { SETTINGS_KEYS } from '../../core/schema.js';
 import { todayStr, currentMonthKey, monthKeyFromDate } from '../../core/date.js';
+import { Bus } from '../../core/bus.js';
 
 // ---- Expenses ----
 
@@ -35,6 +36,18 @@ export async function saveExpense(data) {
     fromSubscription: Boolean(data.fromSubscription),
   };
   await DB.put('expenses', expense);
+  Bus.emit('expense.logged', expense);
+  // Also emit a friendly "under daily limit" signal the auto-trigger
+  // layer can hook. Computed here so the listener stays dumb.
+  try {
+    const monthly = await getMonthlyBudget();
+    if (monthly > 0 && expense.date === todayStr()) {
+      const today = await getTodaySpend();
+      if (today <= monthly / 30) {
+        Bus.emit('budget.day_under_limit', { date: expense.date, total: today, dailyBudget: monthly / 30 });
+      }
+    }
+  } catch {}
   return expense;
 }
 

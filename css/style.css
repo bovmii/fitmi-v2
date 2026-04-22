@@ -2772,3 +2772,30 @@ textarea:focus { outline: none; border-color: var(--accent); }
 }
 .tail-row span { color: var(--text-secondary); }
 .tail-row strong { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Simple inline toggle row used in habit form & shopping checkout */
+.toggle-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.toggle-line input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+  flex-shrink: 0;
+}
+
+select[name] {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  width: 100%;
+}
+select[name]:focus { outline: none; border-color: var(--accent); }
