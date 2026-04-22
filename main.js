@@ -124,13 +124,12 @@ async function main() {
   initSync();
   initHabitAutoTriggers();
   initWidgetRefresh();
-  onSync(({ event, payload }) => {
-    if (event === 'sync.push.done' || event === 'sync.pull.done') {
-      const p = payload?.pushed ?? payload?.pulled ?? 0;
-      if (p > 0) showToast(`Sync : ${event === 'sync.push.done' ? 'envoyé' : 'reçu'} ${p}`);
-    }
-    if (event === 'sync.offline') showToast('Hors-ligne — les écritures seront synchronisées au retour');
-    if (event === 'sync.online') showToast('De retour en ligne — sync en cours…');
+  // Sync is intentionally invisible when it works — only surface the
+  // connectivity transitions so the user knows when writes will be
+  // buffered locally.
+  onSync(({ event }) => {
+    if (event === 'sync.offline') showToast('Hors-ligne — les modifications seront synchronisées au retour');
+    if (event === 'sync.online') showToast('De retour en ligne');
   });
 
   if (Auth.isAuthenticated() && !Auth.isLocalOnly()) {
