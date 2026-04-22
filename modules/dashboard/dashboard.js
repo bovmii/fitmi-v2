@@ -20,6 +20,11 @@ import {
 } from '../habits/data.js';
 import { openHabitForm } from '../habits/form.js';
 import { openAllHabits } from '../habits/all.js';
+import {
+  getMonthSummary, getTodaySpend, getAllSubscriptions, subsDueToday,
+} from '../budget/data.js';
+import { formatEUR } from '../budget/categories.js';
+import { openAddExpense } from '../budget/add.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -72,9 +77,12 @@ export async function mount(root) {
         <div class="dash-pending">${icon('dumbbell', { size: 18 })}<span>Séance du jour — phase 4d</span></div>
       </section>
 
-      <section class="dash-section dash-placeholder-card">
-        <div class="dash-section-head"><h2>Budget</h2></div>
-        <div class="dash-pending">${icon('wallet', { size: 18 })}<span>Dépenses du jour — phase 4b</span></div>
+      <section class="dash-section" data-section="budget">
+        <div class="dash-section-head">
+          <h2>Budget</h2>
+          <button class="btn-link" data-budget-add>Ajouter</button>
+        </div>
+        <div class="dash-budget-card" data-budget-card></div>
       </section>
     </div>
   `;
@@ -83,6 +91,10 @@ export async function mount(root) {
   root.querySelector('.dash-date').textContent = formatGreetingDate();
 
   root.querySelector('[data-view-all]').onclick = () => openAllHabits({ onChange: refreshHabits });
+  root.querySelector('[data-budget-add]').onclick = async () => {
+    const saved = await openAddExpense({});
+    if (saved) await refreshBudget();
+  };
 
   async function refreshHabits() {
     const strip = root.querySelector('[data-habits-strip]');
@@ -141,4 +153,37 @@ export async function mount(root) {
   }
 
   await refreshHabits();
+  await refreshBudget();
+
+  async function refreshBudget() {
+    const card = root.querySelector('[data-budget-card]');
+    if (!card) return;
+    const [summary, today, subs] = await Promise.all([
+      getMonthSummary(),
+      getTodaySpend(),
+      getAllSubscriptions(),
+    ]);
+    const dueToday = subsDueToday(subs);
+    const pct = summary.monthly > 0 ? Math.min(100, (summary.total / summary.monthly) * 100) : 0;
+    const over = summary.remaining < 0;
+
+    const dueLine = dueToday.length > 0
+      ? `<div class="dash-budget-alert">${icon('bell', { size: 14 })}<span>Prélèvement aujourd'hui : ${dueToday.map((s) => escapeHtml(s.name) + ' ' + formatEUR(s.amount)).join(' · ')}</span></div>`
+      : '';
+
+    card.innerHTML = `
+      <div class="dash-budget-top">
+        <div>
+          <div class="dash-budget-label">Aujourd'hui</div>
+          <div class="dash-budget-value">${today > 0 ? '-' + formatEUR(today) : formatEUR(0)}</div>
+        </div>
+        <div>
+          <div class="dash-budget-label">${over ? 'Dépassement' : 'Ce mois'}</div>
+          <div class="dash-budget-value ${over ? 'danger' : ''}">${formatEUR(summary.total)}${summary.monthly > 0 ? ` / ${formatEUR(summary.monthly)}` : ''}</div>
+        </div>
+      </div>
+      ${summary.monthly > 0 ? `<div class="budget-bar"><div class="budget-bar-fill ${over ? 'danger' : ''}" style="width:${pct}%"></div></div>` : ''}
+      ${dueLine}
+    `;
+  }
 }
