@@ -25,6 +25,8 @@ import {
 } from '../budget/data.js';
 import { formatEUR } from '../budget/categories.js';
 import { openAddExpense } from '../budget/add.js';
+import { getDayTotals, getNutritionTargets } from '../nutrition/data.js';
+import { openAddFood } from '../nutrition/add.js';
 
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({
@@ -67,9 +69,12 @@ export async function mount(root) {
         <div class="dash-habits-strip" data-habits-strip></div>
       </section>
 
-      <section class="dash-section dash-placeholder-card">
-        <div class="dash-section-head"><h2>Nutrition</h2></div>
-        <div class="dash-pending">${icon('utensils', { size: 18 })}<span>Calories & repas — phase 4c</span></div>
+      <section class="dash-section" data-section="nutrition">
+        <div class="dash-section-head">
+          <h2>Nutrition</h2>
+          <button class="btn-link" data-nutri-add>Ajouter</button>
+        </div>
+        <div class="dash-nutri-card" data-nutri-card></div>
       </section>
 
       <section class="dash-section dash-placeholder-card">
@@ -94,6 +99,10 @@ export async function mount(root) {
   root.querySelector('[data-budget-add]').onclick = async () => {
     const saved = await openAddExpense({});
     if (saved) await refreshBudget();
+  };
+  root.querySelector('[data-nutri-add]').onclick = async () => {
+    const r = await openAddFood({});
+    if (r?.logged) await refreshNutrition();
   };
 
   async function refreshHabits() {
@@ -154,6 +163,33 @@ export async function mount(root) {
 
   await refreshHabits();
   await refreshBudget();
+  await refreshNutrition();
+
+  async function refreshNutrition() {
+    const card = root.querySelector('[data-nutri-card]');
+    if (!card) return;
+    const [totals, targets] = await Promise.all([getDayTotals(), getNutritionTargets()]);
+    const consumed = Math.round(totals.kcal);
+    const target = targets.kcal || 0;
+    const pct = target > 0 ? Math.min(100, (consumed / target) * 100) : 0;
+    const remaining = Math.max(0, target - consumed);
+    card.innerHTML = `
+      <div class="dash-nutri-top">
+        <div>
+          <div class="dash-budget-label">Calories</div>
+          <div class="dash-budget-value">${consumed}${target > 0 ? ` / ${target}` : ''}</div>
+        </div>
+        ${target > 0 ? `<div>
+          <div class="dash-budget-label">Reste</div>
+          <div class="dash-budget-value">${remaining}</div>
+        </div>` : ''}
+      </div>
+      ${target > 0
+        ? `<div class="budget-bar"><div class="budget-bar-fill" style="width:${pct}%"></div></div>`
+        : `<div class="settings-hint">Définis tes besoins dans Nutrition → ${icon('settings', { size: 12 })}</div>`}
+      ${totals.count > 0 ? `<div class="dash-nutri-meta">${totals.count} entrée${totals.count > 1 ? 's' : ''} · P ${Math.round(totals.p)} g · G ${Math.round(totals.c)} g · L ${Math.round(totals.f)} g</div>` : ''}
+    `;
+  }
 
   async function refreshBudget() {
     const card = root.querySelector('[data-budget-card]');
