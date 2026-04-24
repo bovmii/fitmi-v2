@@ -17,12 +17,13 @@ import { DB } from './core/db.js';
 import { initFitmiDB } from './core/schema.js';
 import { runMigrationIfNeeded, migrationStatus, markAllDirty } from './core/migration.js';
 import { Auth } from './core/auth.js';
-import { initSync, syncNow, onSync } from './core/sync.js';
+import { initSync, syncNow } from './core/sync.js';
 import { isConfigured } from './core/supabase.js';
 import { renderLogin } from './modules/auth/login.js';
 import { renderShell } from './modules/shell/shell.js';
 import { initHabitAutoTriggers } from './modules/habits/auto-triggers.js';
 import { initWidgetRefresh } from './core/widgets.js';
+import { initDeepLinks } from './core/deep-link.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -124,13 +125,7 @@ async function main() {
   initSync();
   initHabitAutoTriggers();
   initWidgetRefresh();
-  // Sync is intentionally invisible when it works — only surface the
-  // connectivity transitions so the user knows when writes will be
-  // buffered locally.
-  onSync(({ event }) => {
-    if (event === 'sync.offline') showToast('Hors-ligne — les modifications seront synchronisées au retour');
-    if (event === 'sync.online') showToast('De retour en ligne');
-  });
+  initDeepLinks();
 
   if (Auth.isAuthenticated() && !Auth.isLocalOnly()) {
     await syncNow();
