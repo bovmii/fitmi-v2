@@ -48,6 +48,48 @@ export async function pushWidgetData(data) {
   }
 }
 
+// Drain the "pending" queue the widget AppIntents write to — a tap on
+// the widget's +/− or a habit dot updates shared UserDefaults
+// optimistically and appends an action here. On foreground we replay
+// each action against IndexedDB so the source of truth catches up.
+export async function flushPendingWidgetActions() {
+  const bridge = await loadBridge();
+  if (!bridge || !bridge.readPending) return { skipped: true };
+  let pending = [];
+  try {
+    const res = await bridge.readPending();
+    pending = Array.isArray(res?.pending) ? res.pending : [];
+  } catch (err) {
+    console.warn('[widgets] readPending failed', err);
+    return { error: String(err) };
+  }
+  if (pending.length === 0) return { flushed: 0 };
+
+  let applied = 0;
+  for (const action of pending) {
+    try {
+      if (action.kind === 'water.add') {
+        const { logGlass } = await import('../modules/nutrition/data.js');
+        await logGlass();
+        applied++;
+      } else if (action.kind === 'water.remove') {
+        const { removeLastGlass } = await import('../modules/nutrition/data.js');
+        await removeLastGlass();
+        applied++;
+      } else if (action.kind === 'habit.toggle' && action.habitId) {
+        const { toggleHabit } = await import('../modules/habits/data.js');
+        await toggleHabit(action.habitId);
+        applied++;
+      }
+    } catch (err) {
+      console.warn('[widgets] replay failed', action, err);
+    }
+  }
+
+  try { await bridge.clearPending(); } catch {}
+  return { flushed: applied };
+}
+
 // Aggregate every widget-relevant data point and push a single
 // snapshot. Called on boot and debounced on every DB mutation via
 // initWidgetRefresh().
@@ -144,5 +186,20 @@ export async function initWidgetRefresh() {
   const { Bus } = await import('./bus.js');
   Bus.on('db.put', schedule);
   Bus.on('db.delete', schedule);
-  schedule();
+
+  // Drain anything the widget queued while we were backgrounded,
+  // then push a fresh snapshot back up so the widget reflects the
+  // post-flush state (not the optimistic state the intent wrote).
+  const replayThenPush = async () => {
+    try { await flushPendingWidgetActions(); } catch {}
+    schedule();
+  };
+  replayThenPush();
+
+  try {
+    const { App } = await import('https://esm.sh/@capacitor/app@8.1.0');
+    App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) replayThenPush();
+    });
+  } catch {}
 }
