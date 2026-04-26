@@ -16,12 +16,18 @@ import { showToast, confirmModal } from '../../core/ui.js';
 import { syncNow } from '../../core/sync.js';
 import { openPasswordChange } from '../auth/password-change.js';
 import { isConfigured } from '../../core/supabase.js';
+import { openTdeeModal } from '../nutrition/tdee.js';
+import { getTdeeProfile, getNutritionTargets } from '../nutrition/data.js';
 
-export function openSettings() {
+export async function openSettings() {
   const existing = document.getElementById('settings-drawer');
   if (existing) existing.remove();
 
   const u = Auth.getUser();
+  const [tdeeProfile, targets] = await Promise.all([getTdeeProfile(), getNutritionTargets()]);
+  const tdeeSummary = (tdeeProfile && targets.kcal > 0)
+    ? `<div class="settings-row"><span class="settings-label">Objectif</span><span class="settings-value">${targets.kcal} kcal · ${targets.protein}P / ${targets.carbs}G / ${targets.fat}L</span></div>`
+    : `<div class="settings-row"><span class="settings-label">Objectif</span><span class="settings-value" style="color:var(--text-muted)">Non configuré</span></div>`;
   const overlay = document.createElement('div');
   overlay.id = 'settings-drawer';
   overlay.className = 'drawer-overlay';
@@ -43,6 +49,10 @@ export function openSettings() {
             <span class="settings-label">Email</span>
             <span class="settings-value">${u?.email || '—'}</span>
           </div>
+          ${tdeeSummary}
+          <button class="settings-btn" id="btn-open-tdee">
+            ${icon('settings', { size: 16 })}<span>Configurer mes besoins</span>
+          </button>
         </section>
 
         <section class="settings-section">
@@ -106,6 +116,11 @@ export function openSettings() {
   const close = () => overlay.remove();
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
   overlay.querySelector('[data-close]').addEventListener('click', close);
+
+  overlay.querySelector('#btn-open-tdee').addEventListener('click', () => {
+    close();
+    openTdeeModal();
+  });
 
   overlay.querySelector('[data-segment="theme"]').addEventListener('click', (e) => {
     const btn = e.target.closest('button[data-theme]');

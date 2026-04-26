@@ -10,6 +10,8 @@ import {
 } from './data.js';
 import { openTdeeModal } from './tdee.js';
 import { openAddFood } from './add.js';
+
+
 import { renderWater } from './water.js';
 import { renderFasting } from './fasting.js';
 
@@ -114,7 +116,7 @@ export async function renderNutritionLog(root) {
         </svg>
         <div class="cal-ring-text">
           <div class="cal-ring-main"><strong>${consumed}</strong><span>kcal</span></div>
-          <div class="cal-ring-sub">${target > 0 ? `reste <strong>${remaining}</strong>` : 'définis ton objectif'}</div>
+          <div class="cal-ring-sub" ${target > 0 ? '' : 'data-ring-empty role="button" tabindex="0"'}>${target > 0 ? `reste <strong>${remaining}</strong>` : 'définis ton objectif'}</div>
         </div>
       </div>
       <div class="cal-ring-side">
@@ -123,6 +125,9 @@ export async function renderNutritionLog(root) {
         <div class="ring-stat"><span class="ring-stat-label">Entrées</span><strong>${totals.count}</strong></div>
       </div>
     `;
+    host.querySelector('[data-ring-empty]')?.addEventListener('click', () => {
+      openTdeeModal({ onSave: refresh });
+    });
   }
 
   function renderMacros(totals, targets) {

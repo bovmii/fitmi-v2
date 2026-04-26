@@ -27,6 +27,7 @@ import { formatEUR } from '../budget/categories.js';
 import { openAddExpense } from '../budget/add.js';
 import { getDayTotals, getNutritionTargets } from '../nutrition/data.js';
 import { openAddFood } from '../nutrition/add.js';
+import { openTdeeModal } from '../nutrition/tdee.js';
 import { isAvailable as healthAvailable, readStepsToday, readActiveCaloriesToday, requestPermissions as requestHealthPerms } from '../../core/health.js';
 
 function escapeHtml(s) {
@@ -220,9 +221,12 @@ export async function mount(root) {
       </div>
       ${target > 0
         ? `<div class="budget-bar"><div class="budget-bar-fill" style="width:${pct}%"></div></div>`
-        : `<div class="settings-hint">Définis tes besoins dans Nutrition → ${icon('settings', { size: 12 })}</div>`}
+        : `<button class="settings-btn" data-open-tdee-dash>${icon('settings', { size: 16 })}<span>Définis tes besoins</span></button>`}
       ${totals.count > 0 ? `<div class="dash-nutri-meta">${totals.count} entrée${totals.count > 1 ? 's' : ''} · P ${Math.round(totals.p)} g · G ${Math.round(totals.c)} g · L ${Math.round(totals.f)} g</div>` : ''}
     `;
+    card.querySelector('[data-open-tdee-dash]')?.addEventListener('click', () => {
+      openTdeeModal({ onSave: refreshNutrition });
+    });
   }
 
   async function refreshBudget() {
