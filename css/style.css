@@ -1182,6 +1182,94 @@ body {
 .fab-cta-secondary:active { transform: scale(0.96); }
 .fab-cta-secondary:hover { background: var(--accent-dim); }
 
+/* Receipt review drawer */
+.receipt-review .receipt-mode-seg { margin: 4px 0 12px; }
+.receipt-fx { color: var(--text-muted); font-size: 12px; margin-left: 6px; font-weight: 500; }
+.receipt-fx.muted { color: var(--danger); }
+.receipt-grand {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-top: 10px;
+}
+.receipt-grand strong { font-family: 'Outfit', sans-serif; font-size: 18px; }
+.receipt-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.receipt-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.receipt-item-row {
+  display: grid;
+  grid-template-columns: 1fr 90px 36px;
+  gap: 6px;
+  align-items: center;
+}
+.receipt-item-row input {
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+}
+.receipt-item-row input:focus { outline: none; border-color: var(--accent); }
+.receipt-item-price { text-align: right; font-weight: 600; }
+.receipt-item-del {
+  width: 36px;
+  height: 36px;
+  color: var(--text-muted);
+}
+.receipt-item-del:hover { color: var(--danger); }
+.receipt-item-cats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.receipt-item-cat {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.receipt-item-cat.active {
+  border-color: var(--cat-color, var(--accent));
+  background: color-mix(in oklab, var(--cat-color, var(--accent)) 14%, transparent);
+}
+
+.tx-row-btn {
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+}
+.tx-row-btn:hover { background: var(--accent-dim); }
+.tx-row-btn:active { transform: scale(0.99); }
+
 .budget-section {
   display: flex;
   flex-direction: column;

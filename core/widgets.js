@@ -206,10 +206,37 @@ export async function initWidgetRefresh() {
   };
   replayThenPush();
 
+  // Multiple redundant triggers — appStateChange alone misses cases
+  // where the user taps a widget from the lock screen or Today view
+  // while the app is technically still alive in foreground.
   try {
     const { App } = await import('https://esm.sh/@capacitor/app@8.1.0');
     App.addListener('appStateChange', ({ isActive }) => {
       if (isActive) replayThenPush();
     });
   } catch {}
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') replayThenPush();
+  });
+  window.addEventListener('focus', replayThenPush);
+
+  // Belt-and-braces: while the app is visible, poll every 2s so
+  // even if every other signal fails (Capacitor lifecycle quirks,
+  // iOS WebView freezing the page, etc.) the queue can never sit
+  // for long.
+  let pollTimer = null;
+  const startPolling = () => {
+    if (pollTimer) return;
+    pollTimer = setInterval(() => {
+      if (document.visibilityState === 'visible') replayThenPush();
+    }, 2000);
+  };
+  const stopPolling = () => {
+    if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') startPolling();
+    else stopPolling();
+  });
+  startPolling();
 }

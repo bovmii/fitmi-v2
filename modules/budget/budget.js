@@ -171,23 +171,35 @@ export async function mount(root) {
       return;
     }
     const recent = expenses.slice(0, 12);
+    const byId = new Map(recent.map((e) => [e.id, e]));
     host.innerHTML = recent.map((e) => {
       const cat = categoryByKey(e.category);
       return `
-        <div class="tx-row" data-id="${e.id}">
+        <button type="button" class="tx-row tx-row-btn" data-id="${e.id}" data-edit>
           <span class="cat-icon" style="color:${cat.color};">${icon(cat.icon, { size: 16 })}</span>
           <div class="tx-info">
             <div class="tx-title">${escapeHtml(e.description) || cat.key}</div>
             <div class="tx-meta">${formatDateFr(e.date)}${e.fromSubscription ? ' · auto' : ''}</div>
           </div>
           <div class="tx-amount">-${formatEUR(e.amount)}</div>
-          <button class="icon-btn" data-delete>${icon('trash', { size: 14 })}</button>
-        </div>
+          <span class="icon-btn" data-delete>${icon('trash', { size: 14 })}</span>
+        </button>
       `;
     }).join('');
 
+    host.querySelectorAll('[data-edit]').forEach((row) => {
+      row.onclick = async (ev) => {
+        if (ev.target.closest('[data-delete]')) return;
+        const id = row.dataset.id;
+        const expense = byId.get(id);
+        if (!expense) return;
+        const saved = await openAddExpense({ expense });
+        if (saved) await refreshAll();
+      };
+    });
     host.querySelectorAll('[data-delete]').forEach((btn) => {
-      btn.onclick = async () => {
+      btn.onclick = async (ev) => {
+        ev.stopPropagation();
         const id = btn.closest('.tx-row').dataset.id;
         const ok = await confirmModal('Supprimer cette dépense ?', { confirmText: 'Supprimer', danger: true });
         if (!ok) return;
