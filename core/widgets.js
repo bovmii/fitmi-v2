@@ -16,14 +16,24 @@ async function loadBridge() {
   if (loading) return loading;
   if (!(await isNative())) return null;
   loading = (async () => {
-    try {
-      const cap = await import('https://esm.sh/@capacitor/core@8.3.1');
-      Plugin = cap.registerPlugin('WidgetBridge');
-      return Plugin;
-    } catch (err) {
-      console.warn('[widgets] bridge load failed', err);
-      return null;
-    }
+    // Capacitor 8's `registerPlugin('Name')` checks PluginHeaders that
+    // are injected at framework startup. Plugins registered later via
+    // bridge.registerPluginInstance() (the only option for custom
+    // plugins added directly to the App target rather than via SPM)
+    // never appear in that list, so the proxy throws "not implemented
+    // on ios" before ever reaching native. We go one level lower and
+    // call window.Capacitor.nativePromise directly — that's the same
+    // path the proxy takes internally for known plugins, but it skips
+    // the JS-side existence check.
+    const native = window?.Capacitor?.nativePromise;
+    if (typeof native !== 'function') return null;
+    const callNative = (method, options = {}) => native('WidgetBridge', method, options);
+    Plugin = {
+      update: (opts) => callNative('update', opts),
+      readPending: () => callNative('readPending'),
+      clearPending: () => callNative('clearPending'),
+    };
+    return Plugin;
   })();
   return loading;
 }
@@ -54,7 +64,7 @@ export async function pushWidgetData(data) {
 // each action against IndexedDB so the source of truth catches up.
 export async function flushPendingWidgetActions() {
   const bridge = await loadBridge();
-  if (!bridge || !bridge.readPending) return { skipped: true };
+  if (!bridge) return { skipped: true };
   let pending = [];
   try {
     const res = await bridge.readPending();

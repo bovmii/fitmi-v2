@@ -11,5 +11,12 @@
     "LocalNotifications": {
       "iconColor": "#c4a87a"
     }
+  },
+  "experimental": {
+    "ios": {
+      "spm": {
+        "swiftToolsVersion": "6.2"
+      }
+    }
   }
 }
