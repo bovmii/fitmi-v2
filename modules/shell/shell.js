@@ -107,6 +107,14 @@ export function renderShell(root) {
       handler(pane);
       pane.dataset.mounted = '1';
     }
+    // Drain any pending widget actions so the data we're about to
+    // show reflects taps that happened while the app was idle in the
+    // background (e.g. user opened Today widget, tapped + a few times,
+    // then came back). flushPendingWidgetActions is a no-op on web
+    // and a fast path on native when the queue is empty.
+    import('../../core/widgets.js')
+      .then(({ flushPendingWidgetActions }) => flushPendingWidgetActions())
+      .catch(() => {});
   }
 
   // Bottom nav clicks

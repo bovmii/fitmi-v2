@@ -5,6 +5,7 @@
 import { icon } from '../../core/icons.js';
 import { confirmModal } from '../../core/ui.js';
 import { todayStr, addDays, formatDateFr } from '../../core/date.js';
+import { Bus } from '../../core/bus.js';
 import {
   getFoodLogForDate, getDayTotals, deleteFoodEntry, getNutritionTargets,
 } from './data.js';
@@ -75,9 +76,22 @@ export async function renderNutritionLog(root) {
 
   await refresh();
 
-  // Expose a cleanup so the parent sub-tab router can stop our RAF loop.
+  // Re-render when something else writes to nutrition stores — e.g.
+  // the widget AppIntent flushed pending water glasses and we want
+  // the cal-ring + macros + water section to reflect the new state
+  // without forcing the user to navigate away and back.
+  const onExternalChange = ({ store } = {}) => {
+    if (store === 'water_log' || store === 'food_log') refresh();
+  };
+  const offPut = Bus.on('db.put', onExternalChange);
+  const offDel = Bus.on('db.delete', onExternalChange);
+
   return {
-    stop: () => { if (fastingRef?.stop) fastingRef.stop(); },
+    stop: () => {
+      if (fastingRef?.stop) fastingRef.stop();
+      offPut?.();
+      offDel?.();
+    },
   };
 
   async function refresh() {

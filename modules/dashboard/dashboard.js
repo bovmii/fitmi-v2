@@ -173,6 +173,18 @@ export async function mount(root) {
   await refreshNutrition();
   await refreshHealth();
 
+  // Re-render relevant cards when external writes land (e.g. widget
+  // AppIntent flushed water glasses or habit toggles). The widget
+  // bridge writes via DB.put which fires this bus event.
+  const { Bus } = await import('../../core/bus.js');
+  const onPut = ({ store } = {}) => {
+    if (store === 'water_log' || store === 'food_log') refreshNutrition();
+    if (store === 'completions' || store === 'habits') refreshHabits();
+    if (store === 'expenses' || store === 'subscriptions') refreshBudget();
+  };
+  Bus.on('db.put', onPut);
+  Bus.on('db.delete', onPut);
+
   async function refreshHealth() {
     const section = root.querySelector('[data-section="health"]');
     if (!section) return;
