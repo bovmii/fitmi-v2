@@ -1161,6 +1161,27 @@ body {
 }
 .fab-cta:active { transform: scale(0.98); }
 
+.budget-cta-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+.budget-cta-row .fab-cta { flex: 1; }
+.fab-cta-secondary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.08s, background 0.12s;
+}
+.fab-cta-secondary:active { transform: scale(0.96); }
+.fab-cta-secondary:hover { background: var(--accent-dim); }
+
 .budget-section {
   display: flex;
   flex-direction: column;

@@ -16,6 +16,7 @@
   "homepage": "https://github.com/bovmii/fitmi-v2#readme",
   "dependencies": {
     "@capacitor/app": "^8.1.0",
+    "@capacitor/camera": "^8.1.0",
     "@capacitor/cli": "^8.3.1",
     "@capacitor/core": "^8.3.1",
     "@capacitor/haptics": "^8.0.2",

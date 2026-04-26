@@ -56,6 +56,7 @@ const PATHS = {
   gift: '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M12 7v15"/><path d="M12 7c1.7-1.7 4.4-1.7 6 0 1.7 1.7 1.7 4.4 0 6"/><path d="M12 7c-1.7-1.7-4.4-1.7-6 0-1.7 1.7-1.7 4.4 0 6"/>',
   briefcase: '<rect width="20" height="14" x="2" y="7" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
   piggyBank: '<path d="M19 5c-1.5 0-2.8 1.4-3 2-3.5-1.5-11-.3-11 5 0 1.8 0 3 2 4.5V20h4v-2h3v2h4v-4c1-.5 1.7-1 2-2h2v-4h-2c0-1-.5-1.5-1-2h0V5z"/><path d="M2 9v1c0 1.1.9 2 2 2h1"/><path d="M16 11h.01"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
 };
 
 export function icon(name, { size = 20, stroke = 1.5, className = '' } = {}) {

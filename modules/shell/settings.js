@@ -18,16 +18,20 @@ import { openPasswordChange } from '../auth/password-change.js';
 import { isConfigured } from '../../core/supabase.js';
 import { openTdeeModal } from '../nutrition/tdee.js';
 import { getTdeeProfile, getNutritionTargets } from '../nutrition/data.js';
+import { getGeminiKey, setGeminiKey } from '../budget/receipt.js';
 
 export async function openSettings() {
   const existing = document.getElementById('settings-drawer');
   if (existing) existing.remove();
 
   const u = Auth.getUser();
-  const [tdeeProfile, targets] = await Promise.all([getTdeeProfile(), getNutritionTargets()]);
+  const [tdeeProfile, targets, geminiKey] = await Promise.all([getTdeeProfile(), getNutritionTargets(), getGeminiKey()]);
   const tdeeSummary = (tdeeProfile && targets.kcal > 0)
     ? `<div class="settings-row"><span class="settings-label">Objectif</span><span class="settings-value">${targets.kcal} kcal · ${targets.protein}P / ${targets.carbs}G / ${targets.fat}L</span></div>`
     : `<div class="settings-row"><span class="settings-label">Objectif</span><span class="settings-value" style="color:var(--text-muted)">Non configuré</span></div>`;
+  const geminiStatus = geminiKey
+    ? `<span class="settings-value">Configurée · ${geminiKey.slice(0, 4)}…${geminiKey.slice(-3)}</span>`
+    : `<span class="settings-value" style="color:var(--text-muted)">Non configurée</span>`;
   const overlay = document.createElement('div');
   overlay.id = 'settings-drawer';
   overlay.className = 'drawer-overlay';
@@ -78,6 +82,18 @@ export async function openSettings() {
         ` : ''}
 
         <section class="settings-section">
+          <div class="settings-section-title">Scanner de tickets</div>
+          <div class="settings-row">
+            <span class="settings-label">Clé Gemini</span>
+            ${geminiStatus}
+          </div>
+          <button class="settings-btn" id="btn-set-gemini">
+            ${icon('camera', { size: 16 })}<span>${geminiKey ? 'Modifier la clé' : 'Configurer'}</span>
+          </button>
+          <small class="settings-hint">Clé API Google AI Studio. Elle reste en local sur ton appareil.</small>
+        </section>
+
+        <section class="settings-section">
           <div class="settings-section-title">Données</div>
           <button class="settings-btn" id="btn-export">
             ${icon('download', { size: 16 })}<span>Exporter en JSON</span>
@@ -120,6 +136,16 @@ export async function openSettings() {
   overlay.querySelector('#btn-open-tdee').addEventListener('click', () => {
     close();
     openTdeeModal();
+  });
+
+  overlay.querySelector('#btn-set-gemini').addEventListener('click', async () => {
+    const current = await getGeminiKey();
+    const next = window.prompt('Clé API Gemini (Google AI Studio) :', current || '');
+    if (next === null) return;
+    await setGeminiKey(next);
+    showToast(next ? 'Clé enregistrée.' : 'Clé supprimée.');
+    close();
+    openSettings();
   });
 
   overlay.querySelector('[data-segment="theme"]').addEventListener('click', (e) => {

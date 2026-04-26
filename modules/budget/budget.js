@@ -16,6 +16,7 @@ import {
 } from './data.js';
 import { CATEGORIES, categoryByKey, formatEUR } from './categories.js';
 import { openAddExpense } from './add.js';
+import { captureAndScanReceipt } from './receipt.js';
 import { openSubscriptions } from './subscriptions.js';
 import { openSavings } from './savings.js';
 import { openBudgetSettings } from './budget-settings.js';
@@ -39,9 +40,14 @@ export async function mount(root) {
 
       <section class="budget-summary" data-summary></section>
 
-      <button class="fab-cta" data-add>
-        ${icon('plus', { size: 20 })}<span>Ajouter une dépense</span>
-      </button>
+      <div class="budget-cta-row">
+        <button class="fab-cta" data-add>
+          ${icon('plus', { size: 20 })}<span>Ajouter une dépense</span>
+        </button>
+        <button class="fab-cta-secondary" data-scan title="Scanner un ticket">
+          ${icon('camera', { size: 18 })}
+        </button>
+      </div>
 
       <section data-categories></section>
 
@@ -75,6 +81,10 @@ export async function mount(root) {
   root.querySelector('[data-add]').onclick = async () => {
     const saved = await openAddExpense({});
     if (saved) await refreshAll();
+  };
+  root.querySelector('[data-scan]').onclick = async () => {
+    const n = await captureAndScanReceipt();
+    if (n > 0) await refreshAll();
   };
   root.querySelector('[data-open-settings]').onclick = () => openBudgetSettings({ onChange: refreshAll });
   root.querySelector('[data-open-savings]').onclick = () => openSavings({ onChange: refreshAll });
